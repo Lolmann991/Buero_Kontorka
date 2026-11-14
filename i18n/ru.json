@@ -1,0 +1,6 @@
+{
+  "ui.title": "Конторка",
+  "ui.boot": "Каркас запущен",
+  "ui.tickCounter": "Тиков: {n}",
+  "ui.startShift": "Начать смену"
+}
