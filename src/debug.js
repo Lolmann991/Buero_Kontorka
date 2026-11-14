@@ -1,0 +1,189 @@
+// Скрытая отладочная панель. Включается через ?debug=1 или Ctrl+Shift+D.
+// Игровой логики здесь нет: только set() и emit().
+// Каждый следующий этап добавляет свои кнопки через addSection().
+
+import { state, set, emit, on } from './state.js';
+import { t } from './i18n.js';
+
+const sections = [];   // { id, titleKey, build }
+const refreshers = []; // функции, обновляющие показания из state
+let panel = null;
+let body = null;
+let toggleBtn = null;
+let mounted = false;
+
+// ---------- маленький помощник для DOM ----------
+function h(tag, props = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) e.append(kid);
+  return e;
+}
+
+const CSS = `
+.dbg-toggle, .dbg-panel { position: fixed; z-index: 1000; font: 12px/1.3 system-ui, sans-serif; color: #cfe8cf; }
+.dbg-toggle {
+  top: calc(env(safe-area-inset-top, 0px) + 0.4rem); right: calc(env(safe-area-inset-right, 0px) + 0.4rem);
+  min-width: 3rem; min-height: 2.4rem; padding: 0 0.6rem;
+  background: #0b140b; border: 1px solid #3a5a3a; border-radius: 0.3rem; color: #9fdc9f; font: inherit; font-weight: 700;
+}
+.dbg-panel {
+  top: calc(env(safe-area-inset-top, 0px) + 3.2rem); right: calc(env(safe-area-inset-right, 0px) + 0.4rem);
+  width: 16.5rem; max-height: calc(100% - 4rem); overflow-y: auto;
+  background: rgba(6, 12, 6, 0.92); border: 1px solid #3a5a3a; border-radius: 0.4rem; padding: 0.5rem;
+  -webkit-user-select: none; user-select: none;
+}
+.dbg-panel[hidden] { display: none; }
+.dbg-title { margin: 0 0 0.4rem; font-size: 13px; color: #9fdc9f; }
+.dbg-section { margin: 0 0 0.6rem; padding-top: 0.4rem; border-top: 1px solid #1f3a1f; }
+.dbg-section h3 { margin: 0 0 0.35rem; font-size: 12px; color: #7fb87f; font-weight: 600; }
+.dbg-row { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.35rem; }
+.dbg-row > label { flex: 0 0 5.2rem; }
+.dbg-row input[type=range] { flex: 1; min-width: 0; height: 1.8rem; }
+.dbg-row output { flex: 0 0 2.2rem; text-align: right; font-variant-numeric: tabular-nums; }
+.dbg-btns { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0 0 0.35rem; }
+.dbg-btn, .dbg-row select {
+  min-height: 2.2rem; padding: 0 0.6rem; font: inherit; color: #cfe8cf;
+  background: #101810; border: 1px solid #3a5a3a; border-radius: 0.3rem;
+}
+.dbg-btn:active { background: #1d2d1d; }
+.dbg-status { margin: 0 0 0.4rem; color: #9fdc9f; font-variant-numeric: tabular-nums; }
+`;
+
+function clockText(timeSec) {
+  const m = Math.min(360, Math.floor(timeSec));
+  const hour = Math.floor(m / 60);
+  return `${hour === 0 ? 12 : hour}:${String(m % 60).padStart(2, '0')}`;
+}
+
+// ---------- элементы управления ----------
+function button(labelKey, onPress) {
+  return h('button', { class: 'dbg-btn', type: 'button', onpointerup: onPress }, t(labelKey));
+}
+
+function slider({ labelKey, path, min, max, step = 1 }) {
+  let dragging = false;
+  const out = h('output', {}, '');
+  const input = h('input', { type: 'range', min, max, step });
+  input.addEventListener('pointerdown', () => { dragging = true; });
+  window.addEventListener('pointerup', () => { dragging = false; });
+  window.addEventListener('pointercancel', () => { dragging = false; });
+  input.addEventListener('input', () => {
+    const v = Number(input.value);
+    out.textContent = String(Math.round(v));
+    set(path, v);
+  });
+  const sync = () => {
+    if (dragging) return;
+    const v = state[path];
+    input.value = v;
+    out.textContent = String(Math.round(v));
+  };
+  refreshers.push(sync);
+  sync();
+  return h('div', { class: 'dbg-row' }, h('label', {}, t(labelKey)), input, out);
+}
+
+// ---------- встроенные разделы ----------
+function buildShift(el) {
+  const select = h('select', {});
+  for (let n = 1; n <= 5; n++) select.append(h('option', { value: n }, String(n)));
+  select.addEventListener('change', () => set('night', Number(select.value)));
+  refreshers.push(() => {
+    if (document.activeElement !== select) select.value = state.night;
+  });
+  select.value = state.night;
+
+  const status = h('p', { class: 'dbg-status' }, '');
+  refreshers.push(() => {
+    status.textContent = t('debug.status', {
+      n: state.night,
+      clock: clockText(state.time),
+      load: state.load,
+      state: t(state.running ? 'debug.state.running' : 'debug.state.stopped'),
+    });
+  });
+
+  const skip = (sec) => set('time', Math.min(360, Math.max(0, state.time + sec)));
+
+  el.append(
+    status,
+    h('div', { class: 'dbg-row' }, h('label', {}, t('debug.night')), select),
+    h('div', { class: 'dbg-btns' },
+      button('debug.restart', () => {
+        set('running', false);
+        emit('intent:startShift');
+      })),
+    h('div', { class: 'dbg-btns' },
+      button('debug.skip.10m', () => skip(10)),
+      button('debug.skip.1h', () => skip(60)),
+      button('debug.skip.end', () => set('time', 355))),
+  );
+}
+
+function buildResources(el) {
+  el.append(
+    slider({ labelKey: 'debug.tokens', path: 'tokens', min: 0, max: 100 }),
+    slider({ labelKey: 'debug.sla', path: 'sla', min: 0, max: 100 }),
+    slider({ labelKey: 'debug.appetite', path: 'appetite', min: 0, max: 500 }),
+  );
+}
+
+// ---------- публичный API ----------
+// Следующие этапы вызывают addSection('enemies', 'debug.section.enemies', el => {...}).
+export function addSection(id, titleKey, build) {
+  sections.push({ id, titleKey, build });
+  if (mounted) renderSection({ id, titleKey, build });
+}
+
+function renderSection(s) {
+  const el = h('div', { class: 'dbg-section', 'data-id': s.id }, h('h3', {}, t(s.titleKey)));
+  s.build(el);
+  body.append(el);
+}
+
+function mount() {
+  if (mounted) return;
+  mounted = true;
+
+  document.head.append(h('style', {}, CSS));
+
+  toggleBtn = h('button', { class: 'dbg-toggle', type: 'button',
+    onpointerup: () => { panel.hidden = !panel.hidden; } }, t('debug.toggle'));
+  body = h('div', {});
+  panel = h('div', { class: 'dbg-panel' }, h('h2', { class: 'dbg-title' }, t('debug.title')), body);
+  document.body.append(toggleBtn, panel);
+
+  for (const s of sections) renderSection(s);
+
+  // Показания обновляем 4 раза в секунду из tick.
+  let acc = 0;
+  on('tick', ({ dt }) => {
+    acc += dt;
+    if (acc < 0.25) return;
+    acc = 0;
+    refreshers.forEach((fn) => fn());
+  });
+  refreshers.forEach((fn) => fn());
+
+  // Для проверок из консоли.
+  window.__kontorka = { state, set, emit, on, t };
+}
+
+addSection('shift', 'debug.section.shift', buildShift);
+addSection('resources', 'debug.section.resources', buildResources);
+
+export function initDebug() {
+  if (new URLSearchParams(location.search).get('debug') === '1') {
+    mount();
+    return;
+  }
+  // Без ?debug=1 панель включается горячей клавишей Ctrl+Shift+D.
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && e.code === 'KeyD') mount();
+  });
+}

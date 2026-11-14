@@ -4,6 +4,7 @@ import { state, set, emit, on, newNight } from './state.js';
 import { loadLang, t } from './i18n.js';
 import * as audio from './audio.js';
 import * as desk from './ui/desk.js';
+import { initDebug } from './debug.js';
 
 const MAX_DT = 0.1; // секунды
 const NIGHT_SEC = 360;
@@ -65,11 +66,7 @@ async function boot() {
 
   const ctx = { state, t, emit, on };
   desk.mount(document.getElementById('app'), ctx);
-
-  if (new URLSearchParams(location.search).get('debug') === '1') {
-    // Временно, для проверки в консоли. Полноценная панель — этап 2.
-    window.__kontorka = { state, set, emit, on, t };
-  }
+  initDebug();
 
   requestAnimationFrame(frame);
 }

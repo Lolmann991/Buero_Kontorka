@@ -3,5 +3,20 @@
   "ui.startShift": "Начать смену",
   "ui.headphones": "Лучше играть в наушниках",
   "ui.rotateHint": "Поверните устройство горизонтально",
-  "ui.shiftOver": "Смена окончена"
+  "ui.shiftOver": "Смена окончена",
+  "debug.toggle": "DBG",
+  "debug.title": "Отладка",
+  "debug.section.shift": "Ночь и время",
+  "debug.section.resources": "Ресурсы",
+  "debug.night": "Ночь",
+  "debug.restart": "Перезапустить ночь",
+  "debug.status": "Ночь {n} · {clock} · нагрузка {load} · {state}",
+  "debug.state.running": "идёт",
+  "debug.state.stopped": "стоп",
+  "debug.skip.10m": "+10 мин",
+  "debug.skip.1h": "+1 час",
+  "debug.skip.end": "до 5:55",
+  "debug.tokens": "Токены, %",
+  "debug.sla": "Рейтинг (SLA)",
+  "debug.appetite": "Аппетит ИИ"
 }
