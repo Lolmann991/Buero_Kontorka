@@ -71,6 +71,49 @@
     }
     .clock-svg .seg { fill: #14b014; }
 
+    /* ---------- карта камер на левом мониторе ---------- */
+    .monitor-left { container-type: inline-size; overflow: hidden; }
+    .cam-map { position: absolute; inset: 4% 2% 14% 2%; }
+    .cam-room {
+      position: absolute;
+      box-sizing: border-box;
+      border: 1px solid rgba(80, 160, 80, 0.35);
+      background: rgba(40, 110, 40, 0.08);
+      border-radius: 2px;
+    }
+    .cam-room--blind { border-style: dashed; border-color: rgba(160, 160, 160, 0.3); background: transparent; }
+    .cam-room--desk {
+      display: flex; align-items: center; justify-content: center;
+      border-color: rgba(150, 200, 255, 0.5); background: transparent;
+      font-size: clamp(0.5rem, 2.2cqw, 0.9rem); color: rgba(170, 210, 255, 0.85);
+    }
+    .cam-room--nb { background: rgba(255, 200, 60, 0.18); }
+    .cam-room--hl {
+      border-color: #ffd24a;
+      background: rgba(255, 210, 74, 0.28);
+      box-shadow: 0 0 6px rgba(255, 210, 74, 0.6);
+    }
+    .cam-btn {
+      position: absolute;
+      width: clamp(2.2rem, 6.5cqw, 3.4rem);
+      height: clamp(2.2rem, 6.5cqw, 3.4rem);
+      padding: 0;
+      transform: translate(-50%, -50%);
+      border: 2px solid #4fbf4f;
+      border-radius: 50%;
+      background: #071007;
+      color: #8fe08f;
+      font: 700 clamp(0.8rem, 2.6cqw, 1.3rem) / 1 system-ui, sans-serif;
+      touch-action: manipulation;
+    }
+    .cam-btn:active, .cam-btn--active { background: #1a4a1a; color: #fff; box-shadow: 0 0 8px #4fbf4f; }
+    .cam-caption {
+      position: absolute; left: 2%; right: 2%; bottom: 3%; height: 9%;
+      display: flex; align-items: center;
+      color: #8fe08f; font-size: clamp(0.65rem, 2.2cqw, 1rem);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
     /* ---------- стартовый экран ---------- */
     .start-screen {
       position: absolute;

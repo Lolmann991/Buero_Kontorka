@@ -4,6 +4,8 @@ import { state, set, emit, on, newNight } from './state.js';
 import { loadLang, t } from './i18n.js';
 import * as audio from './audio.js';
 import * as desk from './ui/desk.js';
+import * as cameras from './ui/cameras.js';
+import { loadGraph } from './graph.js';
 import { initDebug } from './debug.js';
 
 const MAX_DT = 0.1; // секунды
@@ -60,12 +62,33 @@ on('intent:startShift', () => {
   set('running', true);
 });
 
+// Открытие камеры: пока только состояние и событие. Вид камеры — этап 4.
+on('intent:openCamera', ({ id }) => {
+  if (!state.running) return;
+  set('camera', id);
+  emit('camera:open', { id });
+});
+
+on('intent:closeCamera', () => {
+  if (state.camera === null) return;
+  set('camera', null);
+  emit('camera:close');
+});
+
 // ---------- запуск ----------
+async function loadJSON(path) {
+  const res = await fetch(new URL(path, document.baseURI));
+  if (!res.ok) throw new Error(`Не удалось загрузить ${path} (${res.status})`);
+  return res.json();
+}
+
 async function boot() {
   await loadLang('ru');
+  loadGraph(await loadJSON('data/rooms.json'));
 
   const ctx = { state, t, emit, on };
   desk.mount(document.getElementById('app'), ctx);
+  cameras.mount(document.getElementById('monitor-left'), ctx);
   initDebug();
 
   requestAnimationFrame(frame);

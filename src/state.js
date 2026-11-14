@@ -17,6 +17,7 @@ function initial() {
     tickets: [],
     enemies: {},
     brokenCams: [],
+    camera: null,       // номер открытой камеры или null
     flags: { demoDone: false, ending: null, unlocked: [] },
   };
 }
@@ -111,6 +112,7 @@ export function newNight(n, cfg = {}) {
   _state.tickets = [];
   _state.enemies = {};
   _state.brokenCams = [];
+  _state.camera = null;
   emit('night:start', { n });
 }
 

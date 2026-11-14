@@ -1,0 +1,476 @@
+{
+  "_note": "Координаты спрайтов (x, y, scale, pose) и slot — заглушки до готовых кадров камер (этапы 4 и 6). Поле map — схема карты камер на левом мониторе, её можно менять свободно.",
+  "player": "desk",
+  "cameras": {
+    "1": {
+      "name": "cams.1.name",
+      "pos": "n_stairs"
+    },
+    "2": {
+      "name": "cams.2.name",
+      "pos": "n_floor"
+    },
+    "3": {
+      "name": "cams.3.name",
+      "pos": "front"
+    },
+    "4": {
+      "name": "cams.4.name",
+      "pos": "n_kitchen"
+    },
+    "5": {
+      "name": "cams.5.name",
+      "pos": "n_hall"
+    },
+    "6": {
+      "name": "cams.6.name",
+      "pos": "s_hall1"
+    },
+    "7": {
+      "name": "cams.7.name",
+      "pos": "s_hall2"
+    },
+    "8": {
+      "name": "cams.8.name",
+      "pos": "s_hall3"
+    },
+    "9": {
+      "name": "cams.9.name",
+      "pos": "s_kitchen"
+    },
+    "10": {
+      "name": "cams.10.name",
+      "pos": "s_floor"
+    },
+    "11": {
+      "name": "cams.11.name",
+      "pos": "s_stairs"
+    }
+  },
+  "positions": {
+    "n_stairs": {
+      "label": "rooms.n_stairs",
+      "next": [
+        "n_floor"
+      ],
+      "blind": false,
+      "pan": -0.8,
+      "cams": [
+        {
+          "cam": 1,
+          "slot": 0,
+          "x": 30,
+          "y": 80,
+          "scale": 1.0,
+          "pose": "near"
+        }
+      ],
+      "map": {
+        "x": 3,
+        "y": 5,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "n_floor": {
+      "label": "rooms.n_floor",
+      "next": [
+        "n_stairs",
+        "n_toilet",
+        "front"
+      ],
+      "blind": false,
+      "pan": -0.6,
+      "cams": [
+        {
+          "cam": 2,
+          "slot": 0,
+          "x": 30,
+          "y": 80,
+          "scale": 1.0,
+          "pose": "near"
+        },
+        {
+          "cam": 1,
+          "slot": 1,
+          "x": 50,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        }
+      ],
+      "map": {
+        "x": 20,
+        "y": 5,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "front": {
+      "label": "rooms.front",
+      "next": [
+        "n_floor",
+        "n_kitchen",
+        "n_hall"
+      ],
+      "blind": false,
+      "pan": -0.5,
+      "cams": [
+        {
+          "cam": 3,
+          "slot": 0,
+          "x": 30,
+          "y": 80,
+          "scale": 1.0,
+          "pose": "near"
+        },
+        {
+          "cam": 2,
+          "slot": 1,
+          "x": 50,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        },
+        {
+          "cam": 5,
+          "slot": 0,
+          "x": 30,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        }
+      ],
+      "map": {
+        "x": 20,
+        "y": 37,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "n_kitchen": {
+      "label": "rooms.n_kitchen",
+      "next": [
+        "front"
+      ],
+      "blind": false,
+      "pan": -0.7,
+      "cams": [
+        {
+          "cam": 4,
+          "slot": 0,
+          "x": 30,
+          "y": 80,
+          "scale": 1.0,
+          "pose": "near"
+        },
+        {
+          "cam": 3,
+          "slot": 1,
+          "x": 50,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        }
+      ],
+      "map": {
+        "x": 35,
+        "y": 37,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "n_hall": {
+      "label": "rooms.n_hall",
+      "next": [
+        "front",
+        "s_hall1"
+      ],
+      "blind": false,
+      "pan": -0.4,
+      "cams": [
+        {
+          "cam": 5,
+          "slot": 1,
+          "x": 50,
+          "y": 80,
+          "scale": 1.0,
+          "pose": "near"
+        },
+        {
+          "cam": 3,
+          "slot": 2,
+          "x": 70,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        },
+        {
+          "cam": 6,
+          "slot": 0,
+          "x": 30,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        }
+      ],
+      "map": {
+        "x": 20,
+        "y": 69,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "n_toilet": {
+      "label": "rooms.n_toilet",
+      "next": [
+        "n_floor"
+      ],
+      "blind": true,
+      "pan": -0.8,
+      "cams": [],
+      "map": {
+        "x": 35,
+        "y": 5,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "s_hall1": {
+      "label": "rooms.s_hall1",
+      "next": [
+        "n_hall",
+        "s_hall2",
+        "desk"
+      ],
+      "blind": false,
+      "pan": -0.3,
+      "cams": [
+        {
+          "cam": 6,
+          "slot": 1,
+          "x": 50,
+          "y": 80,
+          "scale": 1.0,
+          "pose": "near"
+        },
+        {
+          "cam": 5,
+          "slot": 2,
+          "x": 70,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        },
+        {
+          "cam": 7,
+          "slot": 0,
+          "x": 30,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        }
+      ],
+      "map": {
+        "x": 51,
+        "y": 69,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "s_hall2": {
+      "label": "rooms.s_hall2",
+      "next": [
+        "s_hall1",
+        "s_hall3",
+        "s_kitchen",
+        "desk"
+      ],
+      "blind": false,
+      "pan": 0.0,
+      "cams": [
+        {
+          "cam": 7,
+          "slot": 1,
+          "x": 50,
+          "y": 80,
+          "scale": 1.0,
+          "pose": "near"
+        },
+        {
+          "cam": 6,
+          "slot": 2,
+          "x": 70,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        },
+        {
+          "cam": 8,
+          "slot": 0,
+          "x": 30,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        }
+      ],
+      "map": {
+        "x": 51,
+        "y": 37,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "s_hall3": {
+      "label": "rooms.s_hall3",
+      "next": [
+        "s_hall2",
+        "s_kitchen",
+        "s_floor",
+        "desk"
+      ],
+      "blind": false,
+      "pan": 0.3,
+      "cams": [
+        {
+          "cam": 8,
+          "slot": 1,
+          "x": 50,
+          "y": 80,
+          "scale": 1.0,
+          "pose": "near"
+        },
+        {
+          "cam": 7,
+          "slot": 2,
+          "x": 70,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        }
+      ],
+      "map": {
+        "x": 51,
+        "y": 5,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "s_kitchen": {
+      "label": "rooms.s_kitchen",
+      "next": [
+        "s_hall2",
+        "s_hall3"
+      ],
+      "blind": false,
+      "pan": 0.6,
+      "cams": [
+        {
+          "cam": 9,
+          "slot": 0,
+          "x": 30,
+          "y": 80,
+          "scale": 1.0,
+          "pose": "near"
+        },
+        {
+          "cam": 7,
+          "slot": 0,
+          "x": 30,
+          "y": 62,
+          "scale": 0.6,
+          "pose": "far"
+        }
+      ],
+      "map": {
+        "x": 68,
+        "y": 37,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "s_toilet": {
+      "label": "rooms.s_toilet",
+      "next": [
+        "s_floor"
+      ],
+      "blind": true,
+      "pan": 0.5,
+      "cams": [],
+      "map": {
+        "x": 85,
+        "y": 37,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "s_floor": {
+      "label": "rooms.s_floor",
+      "next": [
+        "s_hall3",
+        "s_stairs",
+        "s_toilet"
+      ],
+      "blind": false,
+      "pan": 0.2,
+      "cams": [
+        {
+          "cam": 10,
+          "slot": 0,
+          "x": 30,
+          "y": 80,
+          "scale": 1.0,
+          "pose": "near"
+        }
+      ],
+      "map": {
+        "x": 68,
+        "y": 5,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "s_stairs": {
+      "label": "rooms.s_stairs",
+      "next": [
+        "s_floor"
+      ],
+      "blind": false,
+      "pan": 0.3,
+      "cams": [
+        {
+          "cam": 11,
+          "slot": 0,
+          "x": 30,
+          "y": 80,
+          "scale": 1.0,
+          "pose": "near"
+        }
+      ],
+      "map": {
+        "x": 85,
+        "y": 5,
+        "w": 14,
+        "h": 26
+      }
+    },
+    "desk": {
+      "label": "rooms.desk",
+      "next": [
+        "s_hall1",
+        "s_hall2",
+        "s_hall3"
+      ],
+      "blind": true,
+      "pan": 0.0,
+      "cams": [],
+      "map": {
+        "x": 37,
+        "y": 66,
+        "w": 12,
+        "h": 14
+      },
+      "walkable": false
+    }
+  }
+}

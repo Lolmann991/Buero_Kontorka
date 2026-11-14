@@ -4,6 +4,9 @@
 
 import { state, set, emit, on } from './state.js';
 import { t } from './i18n.js';
+import {
+  positionIds, labelOf, neighbors, distance, camerasFor, isBlind, panOf, validateGraph,
+} from './graph.js';
 
 const sections = [];   // { id, titleKey, build }
 const refreshers = []; // функции, обновляющие показания из state
@@ -51,6 +54,7 @@ const CSS = `
   background: #101810; border: 1px solid #3a5a3a; border-radius: 0.3rem;
 }
 .dbg-btn:active { background: #1d2d1d; }
+.dbg-info { margin: 0 0 0.35rem; white-space: pre-wrap; color: #b9d9b9; font-size: 11px; }
 .dbg-status { margin: 0 0 0.4rem; color: #9fdc9f; font-variant-numeric: tabular-nums; }
 `;
 
@@ -133,6 +137,42 @@ function buildResources(el) {
   );
 }
 
+function buildGraph(el) {
+  const issues = validateGraph();
+  const check = h('p', { class: 'dbg-info' },
+    issues.length
+      ? [t('debug.graph.issues', { n: issues.length }), ...issues].join('\n')
+      : t('debug.graph.ok'));
+
+  const select = h('select', {});
+  select.append(h('option', { value: '' }, t('debug.pos.none')));
+  for (const id of positionIds()) select.append(h('option', { value: id }, t(labelOf(id))));
+  const info = h('p', { class: 'dbg-info' }, '');
+
+  select.addEventListener('change', () => {
+    const id = select.value;
+    if (!id) {
+      info.textContent = '';
+      emit('debug:highlight', { pos: null, neighbors: [] });
+      return;
+    }
+    const nb = neighbors(id);
+    const d = distance(id, 'desk');
+    const cams = camerasFor(id);
+    info.textContent = [
+      `${t('debug.graph.neighbors')}: ${nb.map((n) => t(labelOf(n))).join(', ') || t('debug.graph.none')}`,
+      `${t('debug.graph.distance')}: ${Number.isFinite(d) ? d : '∞'}`,
+      `${t('debug.graph.cams')}: ${isBlind(id)
+        ? t('debug.graph.blind')
+        : cams.map((c) => t('debug.graph.camEntry', c)).join(', ')}`,
+      `${t('debug.graph.pan')}: ${panOf(id)}`,
+    ].join('\n');
+    emit('debug:highlight', { pos: id, neighbors: nb });
+  });
+
+  el.append(h('div', { class: 'dbg-row' }, h('label', {}, t('debug.pos')), select), info, check);
+}
+
 // ---------- публичный API ----------
 // Следующие этапы вызывают addSection('enemies', 'debug.section.enemies', el => {...}).
 export function addSection(id, titleKey, build) {
@@ -176,6 +216,7 @@ function mount() {
 
 addSection('shift', 'debug.section.shift', buildShift);
 addSection('resources', 'debug.section.resources', buildResources);
+addSection('graph', 'debug.section.graph', buildGraph);
 
 export function initDebug() {
   if (new URLSearchParams(location.search).get('debug') === '1') {
