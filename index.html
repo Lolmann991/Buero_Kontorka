@@ -19,15 +19,29 @@
       user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
-    #app { position: fixed; inset: 0; }
+    #app { position: fixed; inset: 0; overflow: hidden; }
+
+    /* Размытая копия фото на весь экран: заполняет поля, если окно шире кадра */
+    .backdrop {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: blur(18px) brightness(0.55);
+      transform: scale(1.1);
+      pointer-events: none;
+    }
 
     /* ---------- сцена 16:9, все слои в процентах ---------- */
     .stage {
       position: absolute;
       left: 50%;
       top: 50%;
-      width: min(100vw, 177.7778vh);
-      width: min(100vw, 177.7778dvh);
+      /* Кадр 16:9 занимает всю ширину окна. Если окно шире, лишнее обрезается
+         сверху и снизу, но не больше ~9% высоты (195 вместо 177.78). */
+      width: min(100vw, 195vh);
+      width: min(100vw, 195dvh);
       aspect-ratio: 16 / 9;
       transform: translate(-50%, -50%);
       container-type: inline-size;

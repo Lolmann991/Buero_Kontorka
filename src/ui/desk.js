@@ -124,6 +124,12 @@ export function mount(rootEl, ctx) {
   root = rootEl;
   const { state, t, emit, on } = ctx;
 
+  // Фон-подложка для полей по бокам
+  const backdrop = el('img', 'backdrop', root);
+  backdrop.src = 'assets/img/desk/desk.webp';
+  backdrop.alt = '';
+  backdrop.draggable = false;
+
   // Сцена
   els.stage = el('div', 'stage', root);
   const img = el('img', 'desk-photo', els.stage);
