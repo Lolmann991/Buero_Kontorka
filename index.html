@@ -6,12 +6,6 @@
   <meta name="theme-color" content="#050505">
   <title>Конторка</title>
   <style>
-    @font-face {
-      font-family: "Digital7";
-      src: url("assets/fonts/digital-7.ttf") format("truetype");
-      font-display: block;
-    }
-
     html, body {
       margin: 0;
       width: 100%;
@@ -53,28 +47,15 @@
     .monitor-left  { left: 4.07%;  top: 15.73%; width: 45.87%; height: 48.03%; }
     .monitor-right { left: 50.84%; top: 15.73%; width: 45.57%; height: 48.03%; }
 
-    /* Часы Sony. Цифры в фото закрыты тёмной плашкой, время рисует HTML */
-    .clock-plate {
-      left: 86.12%;
-      top: 71.41%;
-      width: 7.66%;
-      height: 5.53%;
-      background: #020303;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      overflow: hidden;
+    /* Часы Sony: SVG в координатах фото (1672x941), цифры рисуются сегментами */
+    .clock-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
     }
-    .clock-digits {
-      font-family: "Digital7", monospace;
-      font-size: 3.9cqw;
-      line-height: 1;
-      color: #1fe01f;
-      text-shadow: 0 0 0.5cqw rgba(31, 224, 31, 0.55);
-      font-variant-numeric: tabular-nums;
-      white-space: pre;
-      transform: translateY(var(--clock-dy, 0));
-    }
+    .clock-svg .seg { fill: #14b014; }
 
     /* ---------- стартовый экран ---------- */
     .start-screen {
