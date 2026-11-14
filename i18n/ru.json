@@ -1,6 +1,7 @@
 {
   "ui.title": "Конторка",
-  "ui.boot": "Каркас запущен",
-  "ui.tickCounter": "Тиков: {n}",
-  "ui.startShift": "Начать смену"
+  "ui.startShift": "Начать смену",
+  "ui.headphones": "Лучше играть в наушниках",
+  "ui.rotateHint": "Поверните устройство горизонтально",
+  "ui.shiftOver": "Смена окончена"
 }

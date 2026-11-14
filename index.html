@@ -3,38 +3,130 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050505">
   <title>Конторка</title>
   <style>
+    @font-face {
+      font-family: "Digital7";
+      src: url("assets/fonts/digital-7.ttf") format("truetype");
+      font-display: block;
+    }
+
     html, body {
       margin: 0;
+      width: 100%;
       height: 100%;
-      background: #050505;
-      color: #9fdc9f;
+      background: #000;
+      color: #d8e6d8;
       font-family: system-ui, "Segoe UI", Roboto, Arial, sans-serif;
       overflow: hidden;
       touch-action: manipulation;
       -webkit-user-select: none;
       user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
-    #app { position: relative; width: 100%; height: 100%; }
-    /* Временная заглушка этапа 0. Удаляется на этапе 1. */
-    #boot {
-      position: absolute; inset: 0;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 0.5rem; text-align: center;
+    #app { position: fixed; inset: 0; }
+
+    /* ---------- сцена 16:9, все слои в процентах ---------- */
+    .stage {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(100vw, 177.7778vh);
+      width: min(100vw, 177.7778dvh);
+      aspect-ratio: 16 / 9;
+      transform: translate(-50%, -50%);
+      container-type: inline-size;
+      background: #000;
     }
-    #boot-title { font-size: 1.5rem; }
-    #boot-tick { font-size: 1rem; opacity: 0.7; font-variant-numeric: tabular-nums; }
+    .desk-photo {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+    }
+    .layer { position: absolute; box-sizing: border-box; }
+
+    /* Мониторы: сюда на этапах 3 и 7 встанут карта камер и Teams */
+    .monitor-left  { left: 4.07%;  top: 15.73%; width: 45.87%; height: 48.03%; }
+    .monitor-right { left: 50.84%; top: 15.73%; width: 45.57%; height: 48.03%; }
+
+    /* Часы Sony. Цифры в фото закрыты тёмной плашкой, время рисует HTML */
+    .clock-plate {
+      left: 86.12%;
+      top: 71.41%;
+      width: 7.66%;
+      height: 5.53%;
+      background: #020303;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      overflow: hidden;
+    }
+    .clock-digits {
+      font-family: "Digital7", monospace;
+      font-size: 3.9cqw;
+      line-height: 1;
+      color: #1fe01f;
+      text-shadow: 0 0 0.5cqw rgba(31, 224, 31, 0.55);
+      font-variant-numeric: tabular-nums;
+      white-space: pre;
+      transform: translateY(var(--clock-dy, 0));
+    }
+
+    /* ---------- стартовый экран ---------- */
+    .start-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.2rem;
+      background: rgba(0, 0, 0, 0.88);
+      text-align: center;
+      padding: 1rem;
+    }
+    .start-screen[hidden] { display: none; }
+    .start-title { margin: 0; font-size: clamp(1.6rem, 6vw, 3rem); letter-spacing: 0.08em; }
+    .start-hint { margin: 0; font-size: 1rem; opacity: 0.7; }
+    .start-btn {
+      min-width: 12rem;
+      min-height: 3.5rem;
+      padding: 0.6rem 1.6rem;
+      font: inherit;
+      font-size: 1.25rem;
+      color: #d8e6d8;
+      background: #101810;
+      border: 2px solid #3a5a3a;
+      border-radius: 0.4rem;
+      touch-action: manipulation;
+    }
+    .start-btn:active { background: #1d2d1d; }
+
+    /* ---------- подсказка «поверни устройство» ---------- */
+    .rotate-hint {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      background: #000;
+      text-align: center;
+      font-size: 1.25rem;
+    }
+    @media (orientation: portrait) {
+      .rotate-hint { display: flex; }
+    }
   </style>
 </head>
 <body>
-  <div id="app">
-    <div id="boot">
-      <div id="boot-title"></div>
-      <div id="boot-tick"></div>
-    </div>
-  </div>
+  <div id="app"></div>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>
