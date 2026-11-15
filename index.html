@@ -172,6 +172,52 @@
       pointer-events: none;
     }
 
+    /* ---------- отключение при 0% токенов (оверлей внутри каждого монитора) ---------- */
+    .sd { position: absolute; inset: 0; z-index: 4; background: #000; pointer-events: auto; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; }
+    .sd[hidden] { display: none; }
+    .sd > * { display: none; }
+    .sd[data-phase="error"], .sd[data-phase="glitch"] { background: #0b0202; }
+    .sd[data-phase="glitch"] { animation: sd-flick 0.2s steps(1) infinite; }
+    .sd[data-phase="error"] .sd-err, .sd[data-phase="glitch"] .sd-err { display: block; }
+    .sd-err { width: 440px; box-sizing: border-box; padding: 18px 22px; border: 2px solid #ff4040; background: #120404; }
+    .sd[data-phase="error"] .sd-err { animation: sd-in 0.4s steps(4) 1; }
+    .sd[data-phase="glitch"] .sd-err { animation: sd-shake 0.3s steps(1) infinite;
+      text-shadow: 2px 0 #00e5ff, -2px 0 #ff0030; }
+    .sd-err__title { color: #ff4040; font-size: 18px; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 10px; }
+    .sd-err__text { color: #ececec; font-size: 14px; line-height: 1.4; }
+    .sd-err__code { color: #888; font-size: 12px; margin-top: 12px; }
+    .sd[data-phase="off"] .sd-line { display: block; position: absolute; left: 0; right: 0; top: 50%; height: 3px;
+      margin-top: -1.5px; background: #fff; box-shadow: 0 0 12px 3px rgba(190, 255, 200, 0.8);
+      animation: sd-collapse 0.6s ease-in forwards; }
+    .sd[data-phase="boot"] .sd-boot, .sd[data-phase="fail"] .sd-boot { display: block; width: 320px; text-align: center; }
+    .sd-boot__title { color: #ececec; font-size: 16px; letter-spacing: 0.06em; margin-bottom: 14px; }
+    .sd-bar { height: 14px; box-sizing: border-box; border: 2px solid #ececec; padding: 2px; }
+    .sd-bar i { display: block; height: 100%; width: 0; background: #ececec; }
+    .sd[data-phase="fail"] .sd-bar { border-color: #ff4040; }
+    .sd[data-phase="fail"] .sd-bar i { background: #ff3030; }
+    .sd-boot__fail { display: none; color: #ff4040; font-size: 14px; font-weight: 700; margin-top: 14px; }
+    .sd[data-phase="fail"] .sd-boot__fail { display: block; }
+    .mon.is-dead::before, .mon.is-dead::after { display: none; }
+    .stage.is-dark .fx-spill { animation: none; opacity: 0; transition: opacity 1.5s; }
+    .stage.is-dark .desk-photo { filter: saturate(0.7) contrast(1.1) brightness(0.6); transition: filter 2s; }
+    @keyframes sd-in { 0% { opacity: 0; } 50% { opacity: 1; } 75% { opacity: 0.3; } 100% { opacity: 1; } }
+    @keyframes sd-flick {
+      0% { background: #0b0202; } 20% { background: #3a0000; } 40% { background: #000; }
+      55% { background: #0b0202; } 70% { background: #1a1a1a; } 85% { background: #000; }
+    }
+    @keyframes sd-shake {
+      0% { transform: translate(0, 0); } 15% { transform: translate(-9px, 3px) skewX(6deg); }
+      30% { transform: translate(7px, -4px); } 45% { transform: translate(-3px, 0) skewX(-8deg) scaleY(1.06); }
+      60% { transform: translate(11px, 2px); } 75% { transform: translate(0, -6px) skewX(4deg); }
+      90% { transform: translate(-6px, 1px); }
+    }
+    @keyframes sd-collapse {
+      0% { transform: scale(1, 6); opacity: 1; } 40% { transform: scale(1, 1); opacity: 1; }
+      100% { transform: scale(0, 1); opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) { .sd, .sd * { animation: none !important; } }
+
     /* ---------- карта камер (левый монитор) ---------- */
     .cam-map { position: absolute; inset: 0; }
     .cam-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -343,7 +389,7 @@
       position: absolute;
       left: 12px;
       bottom: 34px;
-      z-index: 6;
+      z-index: 3;
       min-width: 130px;
       height: 40px;
       padding: 0 12px;

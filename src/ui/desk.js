@@ -222,6 +222,80 @@ function pulses(n, dip, gap) {
   return out;
 }
 
+// ---------- отключение при 0% токенов ----------
+// Ошибки на мониторах -> глюки -> экран гаснет -> попытка перезагрузки -> не включается. Игрок в темноте.
+// Только оформление: длительности фаз считаются из tick, игровой логики здесь нет.
+const SHUTDOWN_PHASES = [['error', 3], ['glitch', 2], ['off', 1.5], ['boot', 3.5], ['fail', 2], ['dead', Infinity]];
+const SHUTDOWN_DELAY = { left: 0, right: 0.7 };   // правый монитор отстаёт: так живее
+const BOOT_STALL_PCT = 72;                         // на каком проценте загрузка «зависает»
+
+function buildShutdown(t) {
+  const mons = [];
+  for (const [side, node] of [['left', els.monLeft], ['right', els.monRight]]) {
+    const root = el('div', 'sd', node);
+    root.hidden = true;
+    const err = el('div', 'sd-err', root);
+    el('div', 'sd-err__title', err).textContent = t(`shutdown.${side}.title`);
+    el('div', 'sd-err__text', err).textContent = t(`shutdown.${side}.text`);
+    el('div', 'sd-err__code', err).textContent = t('shutdown.code');
+    el('div', 'sd-line', root);
+    const boot = el('div', 'sd-boot', root);
+    el('div', 'sd-boot__title', boot).textContent = t('shutdown.boot');
+    const fill = el('i', '', el('div', 'sd-bar', boot));
+    el('div', 'sd-boot__fail', boot).textContent = t('shutdown.fail');
+    mons.push({ root, node, fill, delay: SHUTDOWN_DELAY[side], phase: null });
+  }
+  return { mons, t: -1 };
+}
+
+function startShutdown() {
+  if (els.sd.t < 0) els.sd.t = 0;
+}
+
+function resetShutdown() {
+  const sd = els.sd;
+  if (!sd) return;
+  sd.t = -1;
+  for (const m of sd.mons) {
+    m.phase = null;
+    m.root.hidden = true;
+    m.root.dataset.phase = '';
+    m.node.classList.remove('is-dead');
+    m.fill.style.width = '0%';
+  }
+  els.stage.classList.remove('is-dark');
+}
+
+function updateShutdown(dt) {
+  const sd = els.sd;
+  if (!sd || sd.t < 0) return;
+  sd.t += dt;
+  for (const m of sd.mons) {
+    const local = sd.t - m.delay;
+    let phase = null;
+    let at = 0;
+    if (local >= 0) {
+      let rest = local;
+      for (const [name, dur] of SHUTDOWN_PHASES) {
+        if (rest < dur) { phase = name; at = rest; break; }
+        rest -= dur;
+      }
+    }
+    if (phase !== m.phase) {
+      m.phase = phase;
+      m.root.hidden = phase === null;
+      m.root.dataset.phase = phase || '';
+      m.node.classList.toggle('is-dead', phase === 'off' || phase === 'dead');
+    }
+    if (phase === 'boot') {
+      // загрузка идёт рывками и застревает
+      const pct = BOOT_STALL_PCT * Math.min(1, at / 3.2);
+      m.fill.style.width = `${Math.floor(pct / 6) * 6}%`;
+    }
+  }
+  els.stage.classList.toggle('is-dark', sd.mons[0].phase === 'dead');
+}
+
 function showStart(titleKey, ctx) {
   els.startTitle.textContent = ctx.t(titleKey);
   els.start.hidden = false;
@@ -250,6 +324,7 @@ export function mount(rootEl, ctx) {
   els.monLeft.id = 'monitor-left';
   els.monRight = el('div', 'mon', els.stage);
   els.monRight.id = 'monitor-right';
+  els.sd = buildShutdown(t);
   layoutMonitors();
   if (typeof ResizeObserver !== 'undefined') {
     els.resizeObserver = new ResizeObserver(layoutMonitors);
@@ -301,7 +376,12 @@ export function mount(rootEl, ctx) {
       renderClock(state);
       updateTension(state);
       els.flickWin(dt, state.running);
-      els.flickSpill(dt, state.running && state.load >= 5);
+      els.flickSpill(dt, state.running && state.tokens > 0 && state.load >= 5);
+      updateShutdown(dt);
+    }),
+    on('tokens:change', ({ value }) => {
+      if (value <= 0 && state.running) startShutdown();
+      else if (value > 0) resetShutdown();
     }),
     on('glitch', ({ type }) => {
       if (type !== 'clock333') return;
@@ -311,6 +391,7 @@ export function mount(rootEl, ctx) {
     on('camera:open', syncCam),
     on('camera:close', syncCam),
     on('night:start', () => {
+      resetShutdown();
       shownText = '';
       els.clockGlitch = 0;
       renderClock(state);

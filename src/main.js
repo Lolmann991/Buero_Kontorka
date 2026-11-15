@@ -72,7 +72,7 @@ on('intent:startShift', () => {
 
 // Открытие камеры: состояние и событие; вид рисует ui/cameras.js.
 on('intent:openCamera', ({ id }) => {
-  if (!state.running) return;
+  if (!state.running || state.tokens <= 0) return;
   set('camera', id);
   recalcLoad();
   emit('camera:open', { id });

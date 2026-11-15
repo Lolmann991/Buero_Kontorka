@@ -83,5 +83,12 @@
   "debug.glitch.clock333": "Часы 3:33",
   "agent.callButton": "Позвонить",
   "agent.calling": "Звонок…",
-  "agent.cooldown": "Ждите {s} с"
+  "agent.cooldown": "Ждите {s} с",
+  "shutdown.left.title": "ОШИБКА: ЛИМИТ ТОКЕНОВ",
+  "shutdown.left.text": "Запас токенов ИИ-агента исчерпан. Камеры отключены.",
+  "shutdown.right.title": "Teams: соединение потеряно",
+  "shutdown.right.text": "ИИ-агент недоступен. Запас токенов исчерпан.",
+  "shutdown.code": "КОД 0x544F4B30",
+  "shutdown.boot": "Перезагрузка системы…",
+  "shutdown.fail": "Недостаточно токенов для запуска"
 }
