@@ -3,6 +3,7 @@
 
 const SAVE_KEY = 'kontorka.save.v1';
 const SAVE_VERSION = 1;
+const TOKEN_RATE = 0.1;   // процентов в секунду на единицу нагрузки (стартовое значение для плейтеста)
 
 function initial() {
   return {
@@ -18,6 +19,8 @@ function initial() {
     enemies: {},
     brokenCams: [],
     camera: null,       // номер открытой камеры или null
+    call: { active: false, left: 0, cooldown: 0 }, // звонок-приманка: идёт, осталось, перезарядка (сек)
+    repairing: false,   // удерживается кнопка починки
     flags: { demoDone: false, ending: null, unlocked: [] },
   };
 }
@@ -113,6 +116,8 @@ export function newNight(n, cfg = {}) {
   _state.enemies = {};
   _state.brokenCams = [];
   _state.camera = null;
+  _state.call = { active: false, left: 0, cooldown: 0 };
+  _state.repairing = false;
   emit('night:start', { n });
 }
 
@@ -165,10 +170,18 @@ export function resetSave() {
   } catch (e) {}
 }
 
-// Нагрузка по правилам раздела 5: фон 1, открыта камера +1.
-// Звонок-приманка (+2) и починка (+1) добавятся на этапе 5.
+// Нагрузка по правилам раздела 5: фон 1, камера +1, звонок-приманка +2, починка +1.
 export function recalcLoad() {
-  set('load', 1 + (_state.camera !== null ? 1 : 0));
+  set('load', 1
+    + (_state.camera !== null ? 1 : 0)
+    + (_state.call.active ? 2 : 0)
+    + (_state.repairing ? 1 : 0));
 }
 
-// tickTokens(dt) добавится на этапе 5.
+// Списание токенов: нагрузка × 0,1% в секунду. Потраченное копится в аппетите ИИ.
+export function tickTokens(dt) {
+  if (!_state.running || _state.tokens <= 0) return;
+  const spent = Math.min(_state.tokens, _state.load * TOKEN_RATE * dt);
+  set('tokens', _state.tokens - spent);
+  set('appetite', _state.appetite + spent);
+}

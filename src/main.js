@@ -1,6 +1,6 @@
 // Единственный игровой цикл. Другие модули время берут только из события tick.
 
-import { state, set, patch, emit, on, newNight, recalcLoad } from './state.js';
+import { state, set, patch, emit, on, newNight, recalcLoad, tickTokens } from './state.js';
 import { loadLang, t } from './i18n.js';
 import * as audio from './audio.js';
 import * as desk from './ui/desk.js';
@@ -14,6 +14,7 @@ const CLOCK_333_SEC = 3 * 60 + 33;   // ночь 5: ровно в 3:33 на ча
 
 let last = null;
 let lastHour = 0;
+let nights = {};   // data/nights.json
 
 function frame(now) {
   requestAnimationFrame(frame);
@@ -64,7 +65,7 @@ on('tick', ({ dt }) => {
 on('intent:startShift', () => {
   if (state.running) return;
   audio.init();
-  newNight(state.night);
+  newNight(state.night, nights[state.night] || {});
   lastHour = 0;
   set('running', true);
 });
@@ -90,6 +91,73 @@ on('night:end', () => {
   set('camera', null);
   recalcLoad();
   emit('camera:close');
+});
+
+// ---------- токены, звонок-приманка, починка (этап 5) ----------
+const lureCfg = () => nights[state.night]?.enemies?.mr404?.lure ?? {};
+
+on('tick', ({ dt }) => {
+  if (!state.running) return;
+  tickTokens(dt);
+
+  if (state.call.active) {
+    const left = state.call.left - dt;
+    if (left <= 0) endCall();
+    else set('call.left', left);
+  } else if (state.call.cooldown > 0) {
+    set('call.cooldown', Math.max(0, state.call.cooldown - dt));
+  }
+});
+
+function endCall() {
+  set('call.active', false);
+  set('call.left', 0);
+  set('call.cooldown', lureCfg().cooldownSec ?? 25);
+  recalcLoad();
+  emit('call:end', { id: 'lure', kind: 'lure' });
+}
+
+on('intent:call', () => {
+  if (!state.running || state.tokens <= 0) return;
+  if (state.call.active || state.call.cooldown > 0) return;
+  set('call.active', true);
+  set('call.left', lureCfg().callSec ?? 8);
+  recalcLoad();
+  emit('call:start', { id: 'lure', kind: 'lure' });
+});
+
+// Удержание кнопки починки даёт +1 к нагрузке. Прогресс тикета считает tickets.js (этап 7).
+on('intent:repairStart', () => {
+  if (!state.running || state.tokens <= 0 || state.repairing) return;
+  set('repairing', true);
+  recalcLoad();
+});
+
+on('intent:repairEnd', () => {
+  if (!state.repairing) return;
+  set('repairing', false);
+  recalcLoad();
+});
+
+// 0% токенов: камеры, звонок и починка отключаются; тикеты продолжают приходить.
+on('tokens:change', ({ value }) => {
+  if (value > 0 || !state.running) return;
+  if (state.camera !== null) {
+    set('camera', null);
+    emit('camera:close');
+  }
+  if (state.call.active) endCall();
+  set('repairing', false);
+  recalcLoad();
+});
+
+// Конец смены сбрасывает звонок и починку.
+on('night:end', () => {
+  set('call.active', false);
+  set('call.left', 0);
+  set('call.cooldown', 0);
+  set('repairing', false);
+  recalcLoad();
 });
 
 // ВРЕМЕННО, до этапа 7 (tickets.js): перезагрузка сломанной камеры занимает 2 с игрового времени.
@@ -125,6 +193,11 @@ async function loadJSON(path) {
 async function boot() {
   await loadLang('ru');
   loadGraph(await loadJSON('data/rooms.json'));
+  try {
+    nights = await loadJSON('data/nights.json');
+  } catch (e) {
+    console.warn('nights.json не загружен, берутся значения по умолчанию', e);
+  }
 
   const ctx = { state, t, emit, on };
   desk.mount(document.getElementById('app'), ctx);

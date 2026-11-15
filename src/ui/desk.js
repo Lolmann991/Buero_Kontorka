@@ -174,15 +174,52 @@ function updateTension(state) {
 function buildFxBelow(stage) {
   el('div', 'fx fx-grade', stage);
   const win = el('div', 'fx fx-window', stage);          // свет с улицы сквозь жалюзи
+  els.fxWindow = win;
   el('div', 'fx-window__pass', win);                      // тень «проходит» за окном
-  el('div', 'fx fx-spill', stage);                        // свет мониторов на клавиатуре
+  els.fxSpill = el('div', 'fx fx-spill', stage);          // свет мониторов на клавиатуре
   el('div', 'fx fx-vignette', stage);
 }
 
 function buildFxAbove(stage) {
   el('div', 'fx fx-led', stage);                          // индикатор веб-камеры сам горит красным
-  el('div', 'fx fx-dim', stage);                          // редкие провалы света
   el('div', 'fx fx-grain', stage);
+}
+
+// ---------- мерцание ----------
+// На фото нет ламп, поэтому мерцают только реальные источники света:
+// фонарь за окном (всегда, редко) и свет мониторов (только при перегрузке сети).
+// Серия коротких импульсов с резкими краями. lvl: 1 = норма, меньше = темнее.
+const rand = (a, b) => a + Math.random() * (b - a);
+const REDUCE = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function makeFlicker(node, waitFn, planFn) {
+  let wait = waitFn();
+  let seq = [];
+  let acc = 0;
+  return (dt, enabled = true) => {
+    if (REDUCE || !enabled) {
+      if (seq.length) { seq = []; node.style.filter = ''; }
+      return;
+    }
+    if (seq.length) {
+      acc += dt;
+      while (seq.length && acc >= seq[0].dur) { acc -= seq[0].dur; seq.shift(); }
+      node.style.filter = seq.length ? `brightness(${seq[0].lvl.toFixed(2)})` : '';
+      if (!seq.length) wait = waitFn();
+    } else {
+      wait -= dt;
+      if (wait <= 0) { seq = planFn(); acc = 0; }
+    }
+  };
+}
+
+function pulses(n, dip, gap) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push({ dur: rand(0.03, 0.11), lvl: rand(dip[0], dip[1]) });
+    if (i < n - 1) out.push({ dur: rand(gap[0], gap[1]), lvl: rand(0.9, 1) });
+  }
+  return out;
 }
 
 function showStart(titleKey, ctx) {
@@ -228,6 +265,15 @@ export function mount(rootEl, ctx) {
   buildFxAbove(els.stage);
   renderClock(state);
 
+  // фонарь за окном: редко и неровно, к утру чаще
+  els.flickWin = makeFlicker(els.fxWindow,
+    () => rand(8, 35) * (1 - 0.5 * (els.tension || 0)),
+    () => pulses(2 + Math.floor(Math.random() * 4), [0.15, 0.6], [0.04, 0.25]));
+  // свет мониторов: только при перегрузке сети, часто и коротко
+  els.flickSpill = makeFlicker(els.fxSpill,
+    () => rand(0.4, 1.8),
+    () => pulses(1 + Math.floor(Math.random() * 3), [0.3, 0.7], [0.03, 0.12]));
+
   // Стартовый экран
   els.start = el('div', 'start-screen', root);
   els.startTitle = el('h1', 'start-title', els.start);
@@ -254,6 +300,8 @@ export function mount(rootEl, ctx) {
       if (els.clockGlitch > 0) els.clockGlitch = Math.max(0, els.clockGlitch - dt);
       renderClock(state);
       updateTension(state);
+      els.flickWin(dt, state.running);
+      els.flickSpill(dt, state.running && state.load >= 5);
     }),
     on('glitch', ({ type }) => {
       if (type !== 'clock333') return;

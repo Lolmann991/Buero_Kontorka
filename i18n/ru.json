@@ -80,5 +80,8 @@
   "debug.cam.bright": "Яркость (доп.)",
   "debug.cam.contrast": "Контраст",
   "debug.section.glitches": "Глюки",
-  "debug.glitch.clock333": "Часы 3:33"
+  "debug.glitch.clock333": "Часы 3:33",
+  "agent.callButton": "Позвонить",
+  "agent.calling": "Звонок…",
+  "agent.cooldown": "Ждите {s} с"
 }

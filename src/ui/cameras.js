@@ -163,6 +163,13 @@ function buildView(parent, ctx) {
     els.loadSegs.push(el('i', i < 2 ? 'lv-g' : i < 4 ? 'lv-y' : 'lv-r', bar));
   }
 
+  // Панель ИИ-агента: звонок-приманка
+  els.call = el('button', 'cam-call', els.frame);
+  els.call.type = 'button';
+  onPress(els.call, () => {
+    if (!els.call.disabled) emit('intent:call');
+  });
+
   // Колонка справа: переключение камер и возврат на карту
   const side = el('div', 'cam-side', view);
   const grid = el('div', 'cam-grid', side);
@@ -242,6 +249,18 @@ function syncHud() {
     last.lit = lit;
     els.loadSegs.forEach((seg, i) => seg.classList.toggle('is-lit', i < lit));
   }
+  syncCall();
+}
+
+function syncCall() {
+  const c = S.call;
+  const text = c.active ? T('agent.calling')
+    : c.cooldown > 0 ? T('agent.cooldown', { s: Math.ceil(c.cooldown) })
+    : T('agent.callButton');
+  setText('call', els.call, text);
+  const off = !S.running || S.tokens <= 0 || c.active || c.cooldown > 0;
+  if (els.call.disabled !== off) els.call.disabled = off;
+  els.call.classList.toggle('is-active', c.active);
 }
 
 // Яркость кадра: автоподтяжка тёмных кадров и ручная подстройка (rooms.json → tune, отладка)

@@ -109,10 +109,6 @@
       animation: fx-led 3.4s ease-in-out infinite;
     }
     @keyframes fx-led { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
-    .fx-dim { inset: 0; background: #000; opacity: 0; animation: fx-dim 23s linear infinite; }
-    @keyframes fx-dim {
-      0%, 96% { opacity: 0; } 96.3% { opacity: 0.55; } 96.8% { opacity: 0.1; } 97.3% { opacity: 0.7; } 98% { opacity: 0; }
-    }
     .fx-grain {
       inset: -10%;
       background-image: var(--noise);
@@ -342,6 +338,26 @@
     .hud-time { right: 12px; top: 10px; }
     .hud-name { left: 12px; bottom: 10px; }
     .hud-stat { right: 12px; bottom: 10px; text-align: right; line-height: 1.3; }
+    /* кнопка звонка-приманки (панель ИИ-агента), над названием камеры */
+    .cam-call {
+      position: absolute;
+      left: 12px;
+      bottom: 34px;
+      z-index: 6;
+      min-width: 130px;
+      height: 40px;
+      padding: 0 12px;
+      background: #000;
+      color: #ececec;
+      border: 2px solid #ececec;
+      border-radius: 0;
+      font: 700 14px / 1 ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+      touch-action: manipulation;
+    }
+    .cam-call::after { content: ""; position: absolute; inset: -4px; }
+    .cam-call:active { background: #1f6f1f; border-color: #8dff8d; }
+    .cam-call:disabled { color: #777; border-color: #555; }
+    .cam-call.is-active { color: #fff; border-color: #ff4040; background: #3a0000; }
     .hud-load { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
     .hud-load__label.is-over { color: #ff4040; animation: cam-blink 0.8s step-end infinite; }
     .hud-load__bar { display: flex; gap: 2px; }
