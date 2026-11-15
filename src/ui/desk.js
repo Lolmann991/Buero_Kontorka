@@ -377,11 +377,10 @@ export function mount(rootEl, ctx) {
       updateTension(state);
       els.flickWin(dt, state.running);
       els.flickSpill(dt, state.running && state.tokens > 0 && state.load >= 5);
+      // читаем состояние каждый кадр: так сработает при любом способе обнуления (в т.ч. из отладки)
+      if (state.running && state.tokens <= 0) startShutdown();
+      else if (state.tokens > 0 && els.sd.t >= 0) resetShutdown();
       updateShutdown(dt);
-    }),
-    on('tokens:change', ({ value }) => {
-      if (value <= 0 && state.running) startShutdown();
-      else if (value > 0) resetShutdown();
     }),
     on('glitch', ({ type }) => {
       if (type !== 'clock333') return;
