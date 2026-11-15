@@ -241,17 +241,46 @@ on('tick', ({ dt }) => {
 
 // ---------- звуки интерфейса ----------
 let alarm = null;
+let holdSnd = null;   // петля починки, пока идёт прогресс удержания
+let lureSnd = null;   // звонок-приманка
+function stopHoldSound() { if (holdSnd) { audio.stop(holdSnd); holdSnd = null; } }
+// tickets.js шлёт ticket:progress каждый кадр удержания, а при отпускании — progress 0.
+on('ticket:progress', ({ progress }) => {
+  if (progress > 0 && progress < 1) { if (!holdSnd) holdSnd = audio.play('repair_hold'); }
+  else stopHoldSound();
+});
+on('call:start', ({ kind }) => { if (kind === 'lure') { audio.stop(lureSnd); lureSnd = audio.play('agent_lure'); } });
+on('call:end', ({ kind }) => { if (kind === 'lure' && lureSnd) { audio.stop(lureSnd); lureSnd = null; } });
 on('camera:open', () => audio.play('cam_switch'));
 on('ticket:new', () => audio.play('teams_ping'));
-on('ticket:resolved', () => audio.play('repair_done'));
-on('ticket:missed', () => audio.play('teams_pressure'));
+on('ticket:resolved', () => { stopHoldSound(); audio.play('repair_done'); });
+on('ticket:pressure', () => audio.play('teams_pressure'));   // сообщение-давление в Teams
 on('glitch', ({ source }) => { if (source === 'ai') audio.play('glitch_ai'); });
 on('load:change', ({ overload }) => {
   if (overload && !alarm) alarm = audio.play('overload_alarm');
   else if (!overload && alarm) { audio.stop(alarm); alarm = null; }
 });
+// Шум открытой камеры (amb_cam_feed) и помехи сломанной камеры (cam_static): петли, пока камера открыта.
+let feedSnd = null;
+let staticSnd = null;
+on('tick', () => {
+  const open = state.running && state.camera !== null;
+  const broken = open && state.brokenCams.includes(state.camera);
+  if (open && !feedSnd) feedSnd = audio.play('amb_cam_feed');
+  else if (!open && feedSnd) { audio.stop(feedSnd); feedSnd = null; }
+  if (broken && !staticSnd) staticSnd = audio.play('cam_static');
+  else if (!broken && staticSnd) { audio.stop(staticSnd); staticSnd = null; }
+});
+
+// Щелчок интерфейса на любой кнопке.
+document.addEventListener('pointerdown', (e) => {
+  if (e.target.closest?.('button')) audio.play('ui_click');
+});
+
 on('night:end', () => {
   audio.setAmbient([]);
+  stopHoldSound();
+  if (lureSnd) { audio.stop(lureSnd); lureSnd = null; }
   if (alarm) { audio.stop(alarm); alarm = null; }
 });
 
