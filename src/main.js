@@ -222,6 +222,13 @@ on('jumpscare', ({ enemyId }) => {
 
 on('night:end', () => { enemies = []; });
 
+// Прослушанная запись ночи открывает привязанные к ней записи архива (flags.unlocked: 'call:<id>').
+// call:end для kind 'story' должен приходить и при выключении записи кнопкой (intent:muteCall).
+on('call:end', ({ id, kind }) => {
+  if (kind !== 'story') return;
+  patch('flags.unlocked', (list) => (list.includes(`call:${id}`) ? list : [...list, `call:${id}`]));
+});
+
 // ---------- тикеты (этап 7) ----------
 // Создание, рейтинг, поломка камер, починка и перезагрузка живут в tickets.js; здесь только проводка.
 on('night:start', () => tickets.start(nights[state.night]?.tickets ?? {}));

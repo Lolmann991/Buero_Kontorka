@@ -210,13 +210,26 @@ function syncOverload() {
 function renderArchive() {
   if (!els.arch) return;
   els.arch.replaceChildren();
-  const shown = archive.filter((a) => (a.unlockNight ?? 1) <= S.night);
+  const unlocked = S.flags?.unlocked ?? [];
+  const isOpen = (a) => (a.unlockNight ?? 1) <= S.night && (!a.unlockAfterCall || unlocked.includes(`call:${a.unlockAfterCall}`));
+  const shown = archive.filter(isOpen);
   const locked = archive.length - shown.length;
   el('div', 'tm-arch__hint', els.arch).textContent = T('teams.archive.hint');
   for (const a of shown) {
     const node = el('div', 'tm-arch__item', els.arch);
     const head = el('div', 'tm-arch__head', node);
     el('span', 'tm-chip', head).textContent = T(a.channel);
+    if (Array.isArray(a.messages)) {
+      // Переписка: несколько реплик подряд, у каждой своё время.
+      if (a.title) el('span', 'tm-name', head).textContent = T(a.title);
+      for (const m of a.messages) {
+        const row = el('div', 'tm-arch__msg', node);
+        el('span', 'tm-time', row).textContent = m.time ?? '';
+        el('b', 'tm-name', row).textContent = T(m.author);
+        el('span', 'tm-text', row).textContent = T(m.text);
+      }
+      continue;
+    }
     el('span', 'tm-name', head).textContent = T(a.author);
     el('span', 'tm-time', head).textContent = a.time ?? '';
     el('div', 'tm-text', node).textContent = T(a.text);
@@ -262,6 +275,7 @@ export function mount(rootEl, ctx) {
     }),
     on('ticket:resolved', refreshCards),
     on('ticket:missed', refreshCards),
+    on('call:end', renderArchive),
     on('sla:change', syncSla),
     on('load:change', syncOverload),
     on('night:end', syncOverload),
