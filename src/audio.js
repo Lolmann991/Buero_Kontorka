@@ -8,7 +8,7 @@ let master = null;
 const catalog = {};     // id -> { file, kind, loop, volume }
 const buffers = {};     // id -> AudioBuffer
 let ambient = [];       // [{ id, handle }]
-let loading = null;
+let loading = Promise.resolve();
 
 // Вызывать только из обработчика касания.
 export function init() {
@@ -47,17 +47,27 @@ export function loadCatalog(list) {
 }
 
 // Загрузка и декодирование MP3. Начинается после первого касания (нужен ctx).
+// Каждый звук грузится один раз; звуки, добавленные в каталог позже, докачиваются.
+const failed = [];
+const started = new Set();
 function decodeAll() {
-  if (loading || !ctx) return loading;
-  loading = Promise.all(Object.values(catalog).map(async (s) => {
+  if (!ctx) return loading;
+  const todo = Object.values(catalog).filter((s) => !started.has(s.id));
+  todo.forEach((s) => started.add(s.id));
+  const batch = Promise.all(todo.map(async (s) => {
     try {
-      const res = await fetch(new URL(s.file, document.baseURI));
-      if (!res.ok) throw new Error(res.status);
+      const res = await fetch(new URL(s.file, document.baseURI), { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       buffers[s.id] = await ctx.decodeAudioData(await res.arrayBuffer());
     } catch (e) {
-      console.warn(`audio: не загрузился звук «${s.id}» (${s.file})`, e);
+      failed.push(s.id);
+      console.error(`audio: не загрузился звук «${s.id}» (${s.file})`, e);
     }
-  }));
+  })).then(() => {
+    console.info(`audio: загружено ${Object.keys(buffers).length} из ${Object.keys(catalog).length}`
+      + (failed.length ? `, НЕ загрузились: ${failed.join(', ')}` : ''));
+  });
+  loading = Promise.all([loading, batch]);
   return loading;
 }
 
@@ -67,7 +77,10 @@ const stopped = new WeakSet();
 // at: позиция графа; без at звук играет «в голове» игрока.
 export function play(soundId, opts = {}) {
   // Скример: свой MP3 из каталога; синтез только как запасной вариант, если файл не загрузился.
-  if (soundId === 'jumpscare' && !buffers.jumpscare) return playJumpscare();
+  if (soundId === 'jumpscare' && !buffers.jumpscare) {
+    console.error('audio: jumpscare.mp3 не загружен, играет запасной синтез');
+    return playJumpscare();
+  }
   const def = catalog[soundId];
   if (!def) {
     console.warn(`audio.play: звука «${soundId}» нет в каталоге`);
