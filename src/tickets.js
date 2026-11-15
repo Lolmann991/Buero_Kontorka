@@ -10,9 +10,9 @@ import { state, set, on, emit } from './state.js';
 import { cameraIds } from './graph.js';
 
 const DEFAULTS = {
-  firstAtSec: 25, intervalSec: [40, 70], maxActive: 2, types: ['pc', 'printer', 'camera'],
-  fastSec: 60, slowSec: 120, pressureAfterSec: 75,
-  rating: { fast: 6, slow: 2, missed: -10 },
+  firstAtSec: 30, intervalSec: [50, 85], maxActive: 2, types: ['pc', 'printer', 'camera'],
+  fastSec: 30, slowSec: 75, pressureAfterSec: 45,
+  rating: { fast: 3, slow: 1, missed: -12 },
 };
 
 let data = null;          // data/tickets.json

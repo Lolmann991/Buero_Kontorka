@@ -187,5 +187,13 @@
   "debug.tk.x": "X кнопки, %",
   "debug.tk.y": "Y кнопки, %",
   "debug.tk.show": "Открыть камеру и тикет",
-  "debug.tk.json": "Строка для tickets.json"
+  "debug.tk.json": "Строка для tickets.json",
+  "debug.section.sounds": "Звуки",
+  "debug.snd.sound": "Звук",
+  "debug.snd.at": "Позиция (шагов до стола)",
+  "debug.snd.nopos": "Без позиции (в голове)",
+  "debug.snd.loop": "Петля",
+  "debug.snd.play": "▶ Играть",
+  "debug.snd.stop": "■ Стоп",
+  "debug.snd.hint": "Кнопка «Играть» сама включает звук. Выбери позицию, чтобы услышать, как звук слышен издалека."
 }

@@ -4,10 +4,10 @@
     "startTokens": 100,
     "startSla": 70,
     "tickets": {
-      "firstAtSec": 25,
+      "firstAtSec": 30,
       "intervalSec": [
-        40,
-        70
+        50,
+        85
       ],
       "maxActive": 2,
       "types": [
@@ -15,13 +15,13 @@
         "printer",
         "camera"
       ],
-      "fastSec": 60,
-      "slowSec": 120,
-      "pressureAfterSec": 75,
+      "fastSec": 30,
+      "slowSec": 75,
+      "pressureAfterSec": 45,
       "rating": {
-        "fast": 6,
-        "slow": 2,
-        "missed": -10
+        "fast": 3,
+        "slow": 1,
+        "missed": -12
       }
     },
     "enemies": {

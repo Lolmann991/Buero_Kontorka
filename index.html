@@ -481,7 +481,10 @@
     .tm-dot { position: absolute; right: 10px; top: 16px; width: 9px; height: 9px; border-radius: 50%; background: #ff4a4a; }
     .tm-main { position: relative; flex: 1; min-width: 0; }
     .tm-feed { position: absolute; left: 0; right: 0; top: 0; bottom: 22px; display: flex; flex-direction: column;
-      justify-content: flex-end; gap: 6px; padding: 8px 10px 4px; overflow: hidden; }
+      gap: 6px; padding: 8px 10px 4px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+      scrollbar-width: thin; scrollbar-color: #464eb8 transparent; }
+    /* прижимает сообщения к низу, но не мешает прокрутке (justify-content: flex-end съедал верх списка) */
+    .tm-feed::before { content: ''; flex: none; margin-top: auto; margin-bottom: -6px; }
     .tm-empty { margin: auto; color: #77779a; font-size: 13px; }
     .tm-card, .tm-msg { flex: none; display: flex; gap: 9px; padding: 7px 10px; border-radius: 6px; background: #2a2a3f;
       border-left: 3px solid #7b83eb; }

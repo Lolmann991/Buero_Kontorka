@@ -2,10 +2,15 @@
 // Вкладки: «Поддержка» (тикеты, сообщения-давление, рейтинг) и «Архив» (лор, открывается по ночам).
 // Холст монитора 640×376 px; о перспективе этот модуль ничего не знает.
 
-const MAX_ITEMS = 6;          // сколько карточек держим в ленте
+const MAX_ITEMS = 30;         // сколько карточек держим в ленте
 const TYPING_MIN = 1.2;       // сек печати для самого короткого сообщения
 const TYPING_MAX = 3.5;
 const TYPING_PER_CHAR = 0.06; // длительность печати соответствует длине текста
+
+// Сколько секунд «печатается» сообщение (её же использует main.js для звука клавиатуры).
+export function typingSec(text) {
+  return Math.min(TYPING_MAX, Math.max(TYPING_MIN, text.length * TYPING_PER_CHAR));
+}
 const REFRESH_SEC = 0.2;      // как часто обновляем возраст карточек
 const AGE_FULL_SEC = 120;     // полоса возраста заполняется к моменту пропуска тикета
 
@@ -16,6 +21,7 @@ let T = null;
 let offs = [];
 let archive = [];
 let items = new Map();        // id тикета -> { node, badge, bar }
+let stickBottom = true;       // лента прижата к низу (новые сообщения прокручивают её)
 let pending = [];             // сообщения-давление, которые ещё «печатаются»: { left, total, ticketId, key }
 let acc = 0;
 let tab = 'support';
@@ -79,6 +85,10 @@ function build(ctx) {
 
   const main = el('div', 'tm-main', body);
   els.feed = el('div', 'tm-feed', main);
+  // Автопрокрутка вниз только пока игрок не отлистал ленту вверх.
+  els.feed.addEventListener('scroll', () => {
+    stickBottom = els.feed.scrollHeight - els.feed.scrollTop - els.feed.clientHeight < 40;
+  });
   els.empty = el('div', 'tm-empty', els.feed);
   els.empty.textContent = T('teams.empty');
   els.typing = el('div', 'tm-typing', main);
@@ -134,7 +144,7 @@ function addCard(tk) {
   items.set(tk.id, { node, badge, fill, status: 'open' });
   trimFeed();
   markUnread();
-  els.feed.scrollTop = els.feed.scrollHeight;
+  if (stickBottom) els.feed.scrollTop = els.feed.scrollHeight;
 }
 
 function addMessage(ticketId, key) {
@@ -150,7 +160,7 @@ function addMessage(ticketId, key) {
   els.empty.hidden = true;
   trimFeed();
   markUnread();
-  els.feed.scrollTop = els.feed.scrollHeight;
+  if (stickBottom) els.feed.scrollTop = els.feed.scrollHeight;
 }
 
 // Карточки показывают статус и возраст; читаем state раз в REFRESH_SEC.
@@ -243,6 +253,7 @@ function reset() {
   items.clear();
   pending = [];
   els.feed.replaceChildren(els.empty);
+  stickBottom = true;
   els.empty.hidden = false;
   els.dot.hidden = true;
   syncTyping();
@@ -269,7 +280,7 @@ export function mount(rootEl, ctx) {
     }),
     on('ticket:pressure', ({ id, key }) => {
       const text = T(key);
-      const total = Math.min(TYPING_MAX, Math.max(TYPING_MIN, text.length * TYPING_PER_CHAR));
+      const total = typingSec(text);
       pending.push({ left: total, total, ticketId: id, key });
       syncTyping();
     }),

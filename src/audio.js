@@ -36,6 +36,12 @@ export function init() {
   return ctx;
 }
 
+// Все id звуков (каталог + процедурные заглушки) для отладочной панели.
+export function soundIds() {
+  return [...new Set([...Object.keys(catalog), ...Object.keys(SYNTH)])]
+    .map((id) => ({ id, kind: catalog[id]?.kind ?? 'world', loop: !!catalog[id]?.loop }));
+}
+
 export function getContext() {
   return ctx;
 }
@@ -52,7 +58,7 @@ const failed = [];
 const started = new Set();
 function decodeAll() {
   if (!ctx) return loading;
-  const todo = Object.values(catalog).filter((s) => !started.has(s.id));
+  const todo = Object.values(catalog).filter((s) => s.file && !started.has(s.id));
   todo.forEach((s) => started.add(s.id));
   const batch = Promise.all(todo.map(async (s) => {
     try {
@@ -81,6 +87,7 @@ export function play(soundId, opts = {}) {
     console.error('audio: jumpscare.mp3 не загружен, играет запасной синтез');
     return playJumpscare();
   }
+  ensureSynth(soundId);
   const def = catalog[soundId];
   if (!def) {
     console.warn(`audio.play: звука «${soundId}» нет в каталоге`);
@@ -162,6 +169,93 @@ export function setAmbient(list) {
     const handle = play(id, { loop: true });
     if (handle) ambient.push({ id, handle });
   });
+}
+
+// ---------- процедурные заглушки для звуков, которых нет в assets/audio ----------
+// Работают как обычные звуки каталога (позиция, фильтр, панорама). Чтобы заменить на свой файл,
+// добавь запись с тем же id в data/sounds.json: каталог важнее заглушки.
+const SYNTH = {
+  whistle_mr404: { volume: 0.5, make: makeWhistle },
+  laugh_mr404: { volume: 0.8, make: makeLaugh },
+  warning_attack: { volume: 0.9, make: makeWarning },
+};
+
+function ensureSynth(id) {
+  if (catalog[id] || !SYNTH[id] || !ctx) return;
+  const sr = ctx.sampleRate;
+  const data = SYNTH[id].make(sr);
+  let peak = 0;
+  for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+  const buf = ctx.createBuffer(1, data.length, sr);
+  const ch = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) ch[i] = data[i] / (peak || 1) * 0.8;
+  buffers[id] = buf;
+  catalog[id] = { id, file: null, kind: 'world', loop: false, volume: SYNTH[id].volume };
+  started.add(id);
+}
+
+// Посвист: два наклонных тона с вибрато и лёгким шумом дыхания.
+function makeWhistle(sr) {
+  const n = Math.floor(sr * 1.6);
+  const out = new Float32Array(n);
+  let ph = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const k = t / 1.6;
+    const f = (k < 0.45 ? 1700 + 900 * (k / 0.45) : 2600 - 1100 * ((k - 0.45) / 0.55))
+      * (1 + 0.012 * Math.sin(2 * Math.PI * 6 * t));
+    ph += 2 * Math.PI * f / sr;
+    const env = Math.min(1, t / 0.08) * Math.min(1, (1.6 - t) / 0.25);
+    out[i] = (Math.sin(ph) + 0.06 * (Math.random() * 2 - 1)) * env;
+  }
+  return out;
+}
+
+// Смех: пять низких «ха» с затухающим тоном; гармоники с формантами около 700 и 1200 Гц.
+function makeLaugh(sr) {
+  const n = Math.floor(sr * 2.0);
+  const out = new Float32Array(n);
+  const bursts = 6;
+  for (let b = 0; b < bursts; b++) {
+    const start = Math.floor(sr * (0.05 + b * 0.31));
+    const len = Math.floor(sr * 0.22);
+    const f0 = 150 - b * 7;
+    const harm = [];
+    for (let h = 1; h <= 24; h++) {
+      const f = h * f0;
+      const a = (Math.exp(-(((f - 700) / 300) ** 2)) + 0.6 * Math.exp(-(((f - 1200) / 400) ** 2))) / h ** 0.5;
+      harm.push([f, a]);
+    }
+    for (let i = 0; i < len && start + i < n; i++) {
+      const t = i / sr;
+      const env = Math.min(1, t / 0.015) * Math.exp(-t * 11);
+      let v = 0;
+      for (const [f, a] of harm) v += a * Math.sin(2 * Math.PI * f * t * (1 - 0.15 * t));
+      out[start + i] += (v + 0.15 * (Math.random() * 2 - 1)) * env;
+    }
+  }
+  return out;
+}
+
+// Предупреждение: низкий гул с нарастающей пульсацией и поднимающимся тоном.
+function makeWarning(sr) {
+  const dur = 3.0;
+  const n = Math.floor(sr * dur);
+  const out = new Float32Array(n);
+  let pulsePh = 0;
+  let risePh = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const k = t / dur;
+    pulsePh += 2 * Math.PI * (2 + 8 * k) / sr;
+    const pulse = 0.55 + 0.45 * Math.max(0, Math.sin(pulsePh));
+    risePh += 2 * Math.PI * (180 + 520 * k * k) / sr;
+    const drone = Math.sin(2 * Math.PI * 55 * t) + 0.6 * Math.sin(2 * Math.PI * 82.5 * t);
+    const rise = 0.35 * k * Math.sin(risePh);
+    const env = Math.min(1, t / 0.2) * Math.min(1, (dur - t) / 0.1);
+    out[i] = (drone * pulse + rise + 0.08 * k * (Math.random() * 2 - 1)) * env;
+  }
+  return out;
 }
 
 // Звонки (запись + субтитры): появятся вместе с calls.json.

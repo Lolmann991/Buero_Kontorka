@@ -6,8 +6,9 @@ import { state, set, emit, on } from './state.js';
 import { t } from './i18n.js';
 import {
   positionIds, labelOf, neighbors, distance, camerasFor, isBlind, panOf, validateGraph,
-  cameraIds, cameraMeta, poseIds,
+  cameraIds, cameraMeta, poseIds, PLAYER_POS,
 } from './graph.js';
+import * as audio from './audio.js';
 import { deviceList } from './tickets.js';   // только чтение списка устройств
 
 const sections = [];   // { id, titleKey, build }
@@ -353,6 +354,45 @@ function buildGlitches(el) {
     button('debug.glitch.clock333', () => emit('glitch', { type: 'clock333', source: 'fifth' }))));
 }
 
+// ---------- звуки ----------
+// Прослушивание любого звука каталога: «в голове» или на позиции графа (громкость, фильтр и панорама по расстоянию).
+function buildSounds(el) {
+  const snd = h('select', {});
+  const refill = () => {
+    const cur = snd.value;
+    snd.replaceChildren();
+    for (const s of audio.soundIds()) {
+      snd.append(h('option', { value: s.id }, `${s.id} · ${s.kind}${s.loop ? ' · петля' : ''}`));
+    }
+    if (cur) snd.value = cur;
+  };
+  refill();
+  setTimeout(refill, 500);   // каталог звуков приходит после загрузки sounds.json
+
+  const pos = h('select', {}, h('option', { value: '' }, t('debug.snd.nopos')));
+  for (const id of positionIds()) {
+    const d = distance(id, PLAYER_POS);
+    pos.append(h('option', { value: id }, `${id} · ${t(labelOf(id))} · ${Number.isFinite(d) ? d : '∞'}`));
+  }
+  const loop = h('input', { type: 'checkbox' });
+  const handles = [];
+  const stopAll = () => { handles.splice(0).forEach((x) => audio.stop(x)); };
+
+  el.append(
+    h('div', { class: 'dbg-row' }, h('label', {}, t('debug.snd.sound')), snd),
+    h('div', { class: 'dbg-row' }, h('label', {}, t('debug.snd.at')), pos),
+    h('div', { class: 'dbg-row' }, h('label', {}, t('debug.snd.loop')), loop),
+    h('div', { class: 'dbg-btns' },
+      button('debug.snd.play', () => {
+        audio.init();   // жест пользователя: звук можно включить и без «Начать смену»
+        const opts = { ...(pos.value ? { at: pos.value } : {}), ...(loop.checked ? { loop: true } : {}) };
+        const hd = audio.play(snd.value, opts);
+        if (hd) handles.push(hd);
+      }),
+      button('debug.snd.stop', stopAll)),
+    h('p', { class: 'dbg-info' }, t('debug.snd.hint')));
+}
+
 // ---------- тикеты (этап 7) ----------
 // Принудительные тикеты и подбор точек кнопок починки: двигаешь ползунки, кнопка на камере едет сразу.
 // Готовые строки копируются в data/tickets.json (devices).
@@ -478,6 +518,7 @@ addSection('enemies', 'debug.section.enemies', buildEnemies);
 addSection('mr404', 'debug.section.mr404', buildMr404);
 addSection('tickets', 'debug.section.tickets', buildTickets);
 addSection('glitches', 'debug.section.glitches', buildGlitches);
+addSection('sounds', 'debug.section.sounds', buildSounds);
 
 export function initDebug() {
   if (new URLSearchParams(location.search).get('debug') === '1') {

@@ -70,7 +70,9 @@ on('tick', ({ dt }) => {
 on('intent:startShift', () => {
   if (state.running) return;
   audio.init();
-  audio.setAmbient(['amb_pc_hum', 'amb_night']);
+  overloaded = false;
+  warning = false;
+  syncAmbient();
   newNight(state.night, nights[state.night] || {});
   lastHour = 0;
   set('running', true);
@@ -254,9 +256,28 @@ on('call:end', ({ kind }) => { if (kind === 'lure' && lureSnd) { audio.stop(lure
 on('camera:open', () => audio.play('cam_switch'));
 on('ticket:new', () => audio.play('teams_ping'));
 on('ticket:resolved', () => { stopHoldSound(); audio.play('repair_done'); });
-on('ticket:pressure', () => audio.play('teams_pressure'));   // сообщение-давление в Teams
+// Сообщение-давление: сначала слышна клавиатура на позиции устройства тикета, пока «печатает…», потом звук Teams.
+on('ticket:pressure', ({ id, key }) => {
+  const tk = state.tickets.find((x) => x.id === id);
+  const at = tk ? graph.cameraMeta(tk.cam)?.pos : null;
+  const sec = teams.typingSec(t(key));
+  const kb = audio.play('keyboard', { ...(at ? { at } : {}), loop: true });
+  setTimeout(() => { audio.stop(kb); if (state.running) audio.play('teams_pressure'); }, sec * 1000);
+});
 on('glitch', ({ source }) => { if (source === 'ai') audio.play('glitch_ai'); });
+// Фон: гул и ночь всегда; напряжение при перегрузке сети и во время предупреждения об атаке; темнота с ночи 4.
+let overloaded = false;
+let warning = false;
+function syncAmbient() {
+  const list = ['amb_pc_hum', 'amb_night'];
+  if (overloaded || warning) list.push('amb_tension');
+  if (state.night >= 4) list.push('amb_dark');
+  audio.setAmbient(list);
+}
+on('enemy:status', ({ status }) => { warning = status === 'warning'; if (state.running) syncAmbient(); });
 on('load:change', ({ overload }) => {
+  overloaded = overload;
+  if (state.running) syncAmbient();
   if (overload && !alarm) alarm = audio.play('overload_alarm');
   else if (!overload && alarm) { audio.stop(alarm); alarm = null; }
 });
@@ -274,7 +295,7 @@ on('tick', () => {
 
 // Щелчок интерфейса на любой кнопке.
 document.addEventListener('pointerdown', (e) => {
-  if (e.target.closest?.('button')) audio.play('ui_click');
+  if (e.target.closest?.('button') && !e.target.closest?.('.dbg-panel, .dbg-toggle')) audio.play('ui_click');
 });
 
 on('night:end', () => {
