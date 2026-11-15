@@ -5,8 +5,11 @@ import { loadLang, t } from './i18n.js';
 import * as audio from './audio.js';
 import * as desk from './ui/desk.js';
 import * as cameras from './ui/cameras.js';
-import { loadGraph } from './graph.js';
+import * as graph from './graph.js';
+import * as mr404 from './enemies/mr404.js';
 import { initDebug } from './debug.js';
+
+const ENEMY_MODULES = { mr404 };   // id врага из nights.json -> модуль src/enemies/<id>.js
 
 const MAX_DT = 0.1; // секунды
 const NIGHT_SEC = 360;
@@ -119,7 +122,10 @@ function endCall() {
 
 on('intent:call', () => {
   if (!state.running || state.tokens <= 0) return;
-  if (state.call.active || state.call.cooldown > 0) return;
+  // В окне атаки (враг на s_hall3 и виден на камерах) перезарядка приманки не действует (раздел 18).
+  const dwelling = Object.values(state.enemies).some((e) => e.dwell);
+  if (state.call.active || (state.call.cooldown > 0 && !dwelling)) return;
+  if (dwelling) set('call.cooldown', 0);
   set('call.active', true);
   set('call.left', lureCfg().callSec ?? 8);
   recalcLoad();
@@ -160,6 +166,58 @@ on('night:end', () => {
   recalcLoad();
 });
 
+// ---------- враги (этап 6) ----------
+// Враг сам решает, куда идти, и сообщает событиями; в state.enemies их отражает main.js.
+let enemies = [];
+
+function mirrorEnemy(id, patchObj) {
+  const cur = {};
+  for (const [k, v] of Object.entries(state.enemies)) cur[k] = { ...v };
+  cur[id] = { status: 'idle', ...(cur[id] || {}), ...patchObj };
+  set('enemies', cur);
+}
+
+on('enemy:moved', ({ id, to }) => {
+  if (to === null) {
+    const cur = {};
+    for (const [k, v] of Object.entries(state.enemies)) if (k !== id) cur[k] = { ...v };
+    set('enemies', cur);
+    return;
+  }
+  mirrorEnemy(id, { pos: to });
+});
+
+on('enemy:status', ({ id, status, dwell = false }) => mirrorEnemy(id, { status, dwell }));
+
+on('night:start', () => {
+  enemies = [];
+  const cfgs = nights[state.night]?.enemies ?? {};
+  for (const [id, cfg] of Object.entries(cfgs)) {
+    const mod = ENEMY_MODULES[id];
+    if (!mod) { console.warn(`enemies: нет модуля для «${id}»`); continue; }
+    enemies.push(mod.create(cfg, { state, graph, audio, emit, rng: Math.random }));
+  }
+});
+
+on('tick', ({ dt }) => {
+  if (!state.running) return;
+  for (const e of enemies) e.update(dt);
+});
+
+// Враги получают звонки и команды отладки через onEvent, а не подписываются сами.
+for (const name of ['call:start', 'call:end', 'debug:enemy']) {
+  on(name, (payload) => enemies.forEach((e) => e.onEvent(name, payload)));
+}
+
+// Скример: смена заканчивается провалом. Кадр рисует ui/desk.js, потом стартовый экран «Смена провалена».
+on('jumpscare', ({ enemyId }) => {
+  console.info(`jumpscare: ${enemyId}`);
+  set('running', false);
+  emit('night:end', { n: state.night, failed: true });
+});
+
+on('night:end', () => { enemies = []; });
+
 // ВРЕМЕННО, до этапа 7 (tickets.js): перезагрузка сломанной камеры занимает 2 с игрового времени.
 const REBOOT_SEC = 2;
 const rebooting = new Map(); // номер камеры -> сколько секунд осталось
@@ -192,7 +250,7 @@ async function loadJSON(path) {
 
 async function boot() {
   await loadLang('ru');
-  loadGraph(await loadJSON('data/rooms.json'));
+  graph.loadGraph(await loadJSON('data/rooms.json'));
   try {
     nights = await loadJSON('data/nights.json');
   } catch (e) {

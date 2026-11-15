@@ -284,6 +284,7 @@ function buildEnemies(el) {
     const id = posSel.value;
     const from = Object.values(state.enemies)[0]?.pos ?? null;
     camSel.replaceChildren();
+    emit('debug:enemy', { action: 'freeze', value: !!id });   // пока подбираем спрайт, ИИ не двигает врага
     if (!id) {
       set('enemies', {});
       emit('enemy:moved', { id: ENEMY, from, to: null });
@@ -311,6 +312,38 @@ function buildEnemies(el) {
     row('debug.enemy.light', 'light', 0.2, 3, 0.05),
     row('debug.enemy.edge', 'edge', 0, 4, 1),
     dump,
+  );
+}
+
+// Управление Мистером 404 во время ночи. Только emit: враг принимает команды через onEvent('debug:enemy').
+function buildMr404(el) {
+  const status = h('p', { class: 'dbg-status' }, '');
+  refreshers.push(() => {
+    const e = state.enemies.mr404;
+    status.textContent = e
+      ? t('debug.mr404.status', { pos: t(labelOf(e.pos)), status: e.status, dwell: e.dwell ? t('debug.mr404.dwell') : '' })
+      : t('debug.mr404.absent');
+  });
+
+  const posSel = h('select', {});
+  for (const id of positionIds()) if (id !== 'desk') posSel.append(h('option', { value: id }, t(labelOf(id))));
+
+  let frozen = false;
+  const freezeBtn = button('debug.mr404.freeze', () => {
+    frozen = !frozen;
+    freezeBtn.style.background = frozen ? '#3a5a3a' : '';
+    emit('debug:enemy', { action: 'freeze', value: frozen });
+  });
+
+  el.append(
+    status,
+    h('div', { class: 'dbg-row' }, h('label', {}, t('debug.pos')), posSel),
+    h('div', { class: 'dbg-btns' },
+      button('debug.mr404.move', () => emit('debug:enemy', { action: 'move', pos: posSel.value })),
+      button('debug.mr404.dashNow', () => emit('debug:enemy', { action: 'dashNow' })),
+      button('debug.mr404.attackNow', () => emit('debug:enemy', { action: 'attackNow' })),
+      button('debug.mr404.scare', () => emit('jumpscare', { enemyId: 'mr404' })),
+      freezeBtn),
   );
 }
 
@@ -365,6 +398,7 @@ addSection('resources', 'debug.section.resources', buildResources);
 addSection('graph', 'debug.section.graph', buildGraph);
 addSection('cameras', 'debug.section.cameras', buildCameras);
 addSection('enemies', 'debug.section.enemies', buildEnemies);
+addSection('mr404', 'debug.section.mr404', buildMr404);
 addSection('glitches', 'debug.section.glitches', buildGlitches);
 
 export function initDebug() {

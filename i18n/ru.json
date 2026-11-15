@@ -4,6 +4,7 @@
   "ui.headphones": "Лучше играть в наушниках",
   "ui.rotateHint": "Поверните устройство горизонтально",
   "ui.shiftOver": "Смена окончена",
+  "ui.shiftFailed": "Смена провалена",
   "debug.toggle": "DBG",
   "debug.title": "Отладка",
   "debug.section.shift": "Ночь и время",
@@ -97,5 +98,14 @@
   "debug.enemy.y": "Y, % (ноги, можно за кадр)",
   "debug.enemy.scale": "Масштаб",
   "debug.enemy.light": "Яркость спрайта (×)",
-  "debug.enemy.edge": "Срез каймы, px (0 = выкл.)"
+  "debug.enemy.edge": "Срез каймы, px (0 = выкл.)",
+  "debug.section.mr404": "Мистер 404",
+  "debug.mr404.status": "{pos} · {status}{dwell}",
+  "debug.mr404.absent": "Ещё не пришёл",
+  "debug.mr404.dwell": " · окно атаки",
+  "debug.mr404.move": "Поставить",
+  "debug.mr404.dashNow": "Рывок сейчас",
+  "debug.mr404.attackNow": "Окно атаки",
+  "debug.mr404.scare": "Скример",
+  "debug.mr404.freeze": "Заморозить"
 }

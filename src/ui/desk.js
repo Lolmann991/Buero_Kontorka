@@ -1,6 +1,8 @@
 // Стол, мониторы-слоты, часы Sony, стартовый экран и подсказка поворота.
 // Только рисует и шлёт намерения. Игровой логики здесь нет.
 
+import * as audio from '../audio.js';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // ---------- часы Sony ----------
@@ -296,6 +298,69 @@ function updateShutdown(dt) {
   els.stage.classList.toggle('is-dark', sd.mons[0].phase === 'dead');
 }
 
+// ---------- скример ----------
+// Только оформление: фазы считаются из tick. Вспышка, кадр scream.webp с зумом и дрожанием, резкий чёрный экран,
+// затем стартовый экран «Смена провалена». Игровую сторону (конец смены) решает main.js.
+// Звук: audio.play('jumpscare') без позиции (в голове игрока); id появится на этапе 8.
+const SCARE_FLASH = 0.12;   // секунды
+const SCARE_SHOW = 1.4;
+const SCARE_BLACK = 0.8;
+const SCARE_END = SCARE_FLASH + SCARE_SHOW + SCARE_BLACK;
+const SCARE_ZOOM = 0.45;    // насколько кадр вырастает к концу показа
+const SCARE_SHAKE = [6, 26];   // дрожание в px, от начала к концу
+
+function buildScare(parent) {
+  const rootEl = el('div', 'scare', parent);
+  rootEl.hidden = true;
+  const img = el('img', 'scare-img', rootEl);
+  img.alt = '';
+  img.draggable = false;
+  el('div', 'scare-tint', rootEl);
+  return { root: rootEl, img, t: -1, enemyId: null };
+}
+
+function startScare(enemyId) {
+  const sc = els.scare;
+  if (!sc || sc.t >= 0) return;
+  sc.enemyId = enemyId;
+  sc.img.src = `assets/img/enemies/${enemyId}/scream.webp`;
+  sc.t = 0;
+  sc.root.hidden = false;
+  sc.root.dataset.phase = 'flash';
+  audio.play?.('jumpscare');
+}
+
+function resetScare() {
+  const sc = els.scare;
+  if (!sc) return;
+  sc.t = -1;
+  sc.root.hidden = true;
+  sc.root.dataset.phase = '';
+  sc.img.style.transform = '';
+}
+
+function updateScare(dt, ctx) {
+  const sc = els.scare;
+  if (!sc || sc.t < 0) return;
+  sc.t += dt;
+  if (sc.t >= SCARE_END) {
+    resetScare();
+    showStart('ui.shiftFailed', ctx);
+    return;
+  }
+  if (sc.t < SCARE_FLASH) {
+    sc.root.dataset.phase = 'flash';
+  } else if (sc.t < SCARE_FLASH + SCARE_SHOW) {
+    sc.root.dataset.phase = 'show';
+    const k = (sc.t - SCARE_FLASH) / SCARE_SHOW;
+    const scale = REDUCE ? 1.1 : 1 + SCARE_ZOOM * k * k;
+    const amp = REDUCE ? 0 : SCARE_SHAKE[0] + (SCARE_SHAKE[1] - SCARE_SHAKE[0]) * k;
+    sc.img.style.transform = `translate(${rand(-amp, amp).toFixed(1)}px, ${rand(-amp, amp).toFixed(1)}px) scale(${scale.toFixed(3)})`;
+  } else {
+    sc.root.dataset.phase = 'black';
+  }
+}
+
 function showStart(titleKey, ctx) {
   els.startTitle.textContent = ctx.t(titleKey);
   els.start.hidden = false;
@@ -349,6 +414,8 @@ export function mount(rootEl, ctx) {
     () => rand(0.4, 1.8),
     () => pulses(1 + Math.floor(Math.random() * 3), [0.3, 0.7], [0.03, 0.12]));
 
+  els.scare = buildScare(root);
+
   // Стартовый экран
   els.start = el('div', 'start-screen', root);
   els.startTitle = el('h1', 'start-title', els.start);
@@ -381,7 +448,9 @@ export function mount(rootEl, ctx) {
       if (state.running && state.tokens <= 0) startShutdown();
       else if (state.tokens > 0 && els.sd.t >= 0) resetShutdown();
       updateShutdown(dt);
+      updateScare(dt, ctx);
     }),
+    on('jumpscare', ({ enemyId }) => startScare(enemyId)),
     on('glitch', ({ type }) => {
       if (type !== 'clock333') return;
       els.clockGlitch = CLOCK_GLITCH_SEC;
@@ -391,6 +460,7 @@ export function mount(rootEl, ctx) {
     on('camera:close', syncCam),
     on('night:start', () => {
       resetShutdown();
+      resetScare();
       shownText = '';
       els.clockGlitch = 0;
       renderClock(state);
@@ -398,7 +468,8 @@ export function mount(rootEl, ctx) {
       els.start.hidden = true;
     }),
     // Временно: полноценный экран итога появится на этапе 10.
-    on('night:end', () => showStart('ui.shiftOver', ctx)),
+    // После скримера (failed) стартовый экран покажет updateScare, когда кадр отыграет.
+    on('night:end', (p) => { if (!p?.failed) showStart('ui.shiftOver', ctx); }),
   ];
 }
 
