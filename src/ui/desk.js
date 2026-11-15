@@ -18,6 +18,48 @@ const CLOCK = {
   colon: [1491.0, 720.0],
 };
 
+// ---------- мониторы ----------
+// Экран каждого монитора на фото это четырёхугольник (мониторы стоят чуть V-образно).
+// Холст 640x376 растягивается на него матрицей matrix3d (перспективное преобразование).
+// Углы (в px фото 1672x941): левый верх, правый верх, правый низ, левый низ.
+export const PHOTO_W = 1672;
+export const MONITOR_SIZE = [640, 376];
+export const MONITOR_QUADS = {
+  left:  [[55.3, 138.6], [832.0, 149.4], [832.0, 593.3], [69.0, 601.6]],
+  right: [[847.0, 149.5], [1614.2, 139.0], [1607.0, 600.7], [847.0, 593.6]],
+};
+
+// Прямоугольник w x h -> четырёхугольник quad, масштаб k (px сцены на px фото).
+// Возвращает 16 чисел для CSS matrix3d (по столбцам).
+export function monitorMatrix(quad, w, h, k = 1) {
+  const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = quad;
+  const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
+  const dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+  const den = dx1 * dy2 - dx2 * dy1;
+  const g = (dx3 * dy2 - dx2 * dy3) / den;
+  const hh = (dx1 * dy3 - dx3 * dy1) / den;
+  const a = x1 - x0 + g * x1, b = x3 - x0 + hh * x3, c = x0;
+  const d = y1 - y0 + g * y1, e = y3 - y0 + hh * y3, f = y0;
+  // единичный квадрат -> холст w x h, затем масштаб k для координат на выходе
+  return [
+    (k * a) / w, (k * d) / w, 0, g / w,
+    (k * b) / h, (k * e) / h, 0, hh / h,
+    0, 0, 1, 0,
+    k * c, k * f, 0, 1,
+  ];
+}
+
+function layoutMonitors() {
+  if (!els.stage) return;
+  const k = els.stage.clientWidth / PHOTO_W;
+  if (!k) return;
+  const [w, h] = MONITOR_SIZE;
+  for (const [side, node] of [['left', els.monLeft], ['right', els.monRight]]) {
+    node.style.transform = `matrix3d(${monitorMatrix(MONITOR_QUADS[side], w, h, k).join(',')})`;
+    node.classList.add('is-ready');
+  }
+}
+
 const DIGIT_SEGMENTS = {
   '0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc',
   '5': 'afgcd', '6': 'afgedc', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg',
@@ -137,10 +179,17 @@ export function mount(rootEl, ctx) {
   img.alt = '';
   img.draggable = false;
 
-  els.monLeft = el('div', 'layer monitor-left', els.stage);
+  els.monLeft = el('div', 'mon', els.stage);
   els.monLeft.id = 'monitor-left';
-  els.monRight = el('div', 'layer monitor-right', els.stage);
+  els.monRight = el('div', 'mon', els.stage);
   els.monRight.id = 'monitor-right';
+  layoutMonitors();
+  if (typeof ResizeObserver !== 'undefined') {
+    els.resizeObserver = new ResizeObserver(layoutMonitors);
+    els.resizeObserver.observe(els.stage);
+  } else {
+    window.addEventListener('resize', layoutMonitors);
+  }
 
   els.cells = buildClock(els.stage);
   renderClock(state);
@@ -178,6 +227,7 @@ export function mount(rootEl, ctx) {
 }
 
 export function unmount() {
+  els.resizeObserver?.disconnect();
   offs.forEach((off) => off());
   offs = [];
   if (root) root.replaceChildren();

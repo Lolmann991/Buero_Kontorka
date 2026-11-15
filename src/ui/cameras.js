@@ -1,7 +1,10 @@
-// Левый монитор. На этапе 3: карта камер. Вид камеры на весь экран добавится на этапе 4.
+// Левый монитор. На этапе 3: карта камер в стиле FNaF. Вид камеры на весь экран добавится на этапе 4.
 // Только рисует и шлёт намерения. Игровой логики здесь нет.
 
-import { cameraIds, cameraMeta, mapOf, positionIds, isBlind, PLAYER_POS } from '../graph.js';
+import { cameraIds, cameraMeta, mapOf, mapView, positionIds, isBlind, PLAYER_POS } from '../graph.js';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const HALLS = ['s_hall1', 's_hall2', 's_hall3'];   // сегменты одного зала: границы рисуем пунктиром
 
 let offs = [];
 let root = null;
@@ -14,43 +17,65 @@ function el(tag, className, parent) {
   return e;
 }
 
+function svg(tag, attrs, parent) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
 export function mount(rootEl, ctx) {
   root = rootEl;
   const { state, t, emit, on } = ctx;
+  const view = mapView();
+  if (!view) {
+    console.warn('cameras: в rooms.json нет mapView');
+    return;
+  }
+  const [W, H] = view.size;
 
   const map = el('div', 'cam-map', root);
+  const canvas = svg('svg', { class: 'cam-svg', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none' }, map);
 
-  // Комнаты (контуры). Позиции без прямоугольника на карте пропускаем.
+  // Контуры комнат
   els.rooms = {};
   for (const id of positionIds()) {
     const m = mapOf(id);
     if (!m) continue;
-    const room = el('div', 'cam-room', map);
-    if (id === PLAYER_POS) {
-      room.classList.add('cam-room--desk');
-      room.textContent = t('cams.map.you');
-    } else if (isBlind(id)) {
-      room.classList.add('cam-room--blind');
+    const cls = HALLS.includes(id) ? 'room room--hall' : 'room';
+    const shapes = [m, ...m.extra].map((r) =>
+      svg('rect', { class: cls, x: r.x, y: r.y, width: r.w, height: r.h }, canvas));
+    els.rooms[id] = shapes;
+    if (isBlind(id) && id !== PLAYER_POS) {
+      const wc = svg('text', { class: 'wc', x: m.x + m.w / 2, y: m.y + m.h / 2 }, canvas);
+      wc.textContent = t('cams.map.wc');
     }
-    room.style.left = `${m.x}%`;
-    room.style.top = `${m.y}%`;
-    room.style.width = `${m.w}%`;
-    room.style.height = `${m.h}%`;
-    els.rooms[id] = room;
   }
+  // Общий контур южного зала поверх пунктирных сегментов
+  for (const poly of view.outlines) {
+    svg('polygon', { class: 'outline', points: poly.map(([x, y]) => `${x},${y}`).join(' ') }, canvas);
+  }
+  // Двери: разрывы в стенах
+  for (const d of view.doors) {
+    svg('rect', { class: 'door', x: d.x, y: d.y, width: d.w, height: d.h }, canvas);
+  }
+  // Место игрока
+  svg('rect', { class: 'you-box', x: view.you.x - 4, y: view.you.y - 4, width: 8, height: 8 }, canvas);
+  const you = svg('text', { class: 'you-text', x: view.you.x, y: view.you.y - 9 }, canvas);
+  you.textContent = t('cams.map.you');
 
-  // Кнопки камер в центре своей комнаты
+  // Кнопки камер
   els.buttons = {};
   for (const cam of cameraIds()) {
     const meta = cameraMeta(cam);
-    const m = mapOf(meta.pos);
-    if (!m) continue;
+    if (!meta.btn) continue;
     const btn = el('button', 'cam-btn', map);
     btn.type = 'button';
-    btn.textContent = String(cam);
+    btn.style.left = `${meta.btn.x}px`;
+    btn.style.top = `${meta.btn.y}px`;
+    el('small', '', btn).textContent = t('cams.map.cam');
+    el('span', '', btn).textContent = String(cam);
     btn.setAttribute('aria-label', t('cams.caption', { n: cam, name: t(meta.name) }));
-    btn.style.left = `${m.x + m.w / 2}%`;
-    btn.style.top = `${m.y + m.h / 2}%`;
     btn.addEventListener('pointerup', (e) => {
       if (e.button > 0) return;
       emit('intent:openCamera', { id: cam });
@@ -58,7 +83,7 @@ export function mount(rootEl, ctx) {
     els.buttons[cam] = btn;
   }
 
-  els.caption = el('div', 'cam-caption', root);
+  els.caption = el('div', 'cam-caption', map);
 
   const refresh = () => {
     const open = state.camera;
@@ -76,9 +101,11 @@ export function mount(rootEl, ctx) {
 
   // Подсветка позиции из отладочной панели
   const highlight = ({ pos, neighbors = [] } = {}) => {
-    for (const [id, room] of Object.entries(els.rooms)) {
-      room.classList.toggle('cam-room--hl', id === pos);
-      room.classList.toggle('cam-room--nb', id !== pos && neighbors.includes(id));
+    for (const [id, shapes] of Object.entries(els.rooms)) {
+      for (const r of shapes) {
+        r.classList.toggle('room--hl', id === pos);
+        r.classList.toggle('room--nb', id !== pos && neighbors.includes(id));
+      }
     }
   };
 

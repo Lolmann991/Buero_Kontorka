@@ -4,12 +4,14 @@
 export const PLAYER_POS = 'desk';
 
 let positions = {};   // id -> { id, label, next, pan, cams, map, walkable }
-let cameras = {};     // номер камеры -> { id, name, pos }
+let cameras = {};     // номер камеры -> { id, name, pos, btn }
+let mapViewData = null; // схема карты камер: размер холста, контуры, двери, место игрока
 let distCache = new Map();
 
 export function loadGraph(rooms) {
   positions = {};
   cameras = {};
+  mapViewData = rooms.mapView ? JSON.parse(JSON.stringify(rooms.mapView)) : null;
   distCache = new Map();
   for (const [id, p] of Object.entries(rooms.positions || {})) {
     positions[id] = {
@@ -21,10 +23,11 @@ export function loadGraph(rooms) {
       blind: p.blind,
       cams: (p.cams || []).map((c) => ({ ...c })),
       map: p.map ? { ...p.map } : null,
+      mapExtra: (p.mapExtra || []).map((r) => ({ ...r })),
     };
   }
   for (const [k, c] of Object.entries(rooms.cameras || {})) {
-    cameras[Number(k)] = { id: Number(k), name: c.name, pos: c.pos };
+    cameras[Number(k)] = { id: Number(k), name: c.name, pos: c.pos, btn: c.btn ? { ...c.btn } : null };
   }
 }
 
@@ -75,16 +78,24 @@ export function panOf(posId) {
   return positions[posId]?.pan ?? 0;
 }
 
-// Прямоугольник позиции на карте камер {x, y, w, h} в процентах (или null).
+// Прямоугольник позиции на карте камер {x, y, w, h, extra} в px холста монитора (или null).
+// extra: дополнительные прямоугольники той же комнаты (например, гардероб у парадной).
 export function mapOf(posId) {
-  return positions[posId]?.map ? { ...positions[posId].map } : null;
+  const p = positions[posId];
+  if (!p?.map) return null;
+  return { ...p.map, extra: p.mapExtra.map((r) => ({ ...r })) };
+}
+
+// Общая схема карты: { size: [w, h], you: {x, y}, outlines: [[[x, y], ...]], doors: [{x, y, w, h}] }
+export function mapView() {
+  return mapViewData ? JSON.parse(JSON.stringify(mapViewData)) : null;
 }
 
 export function cameraIds() {
   return Object.keys(cameras).map(Number).sort((a, b) => a - b);
 }
 
-// { id, name (ключ словаря), pos } или undefined
+// { id, name (ключ словаря), pos, btn: {x, y} } или undefined; btn это центр кнопки на карте
 export function cameraMeta(cam) {
   return cameras[cam] ? { ...cameras[cam] } : undefined;
 }
@@ -110,6 +121,7 @@ export function validateGraph() {
   }
 
   for (const cam of cameraIds()) {
+    if (mapViewData && !cameras[cam].btn) issues.push(`камера ${cam}: нет положения кнопки на карте`);
     const own = cameras[cam].pos;
     if (!positions[own]) issues.push(`камера ${cam}: позиции «${own}» нет`);
     else if (!positions[own].cams.some((c) => c.cam === cam)) {

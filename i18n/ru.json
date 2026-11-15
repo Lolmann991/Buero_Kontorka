@@ -58,5 +58,7 @@
   "debug.graph.blind": "нет (слепая зона)",
   "debug.graph.pan": "Панорама",
   "debug.graph.ok": "Проверка графа: без замечаний",
-  "debug.graph.issues": "Проверка графа, замечаний: {n}"
+  "debug.graph.issues": "Проверка графа, замечаний: {n}",
+  "cams.map.cam": "CAM",
+  "cams.map.wc": "WC"
 }

@@ -57,10 +57,6 @@
     }
     .layer { position: absolute; box-sizing: border-box; }
 
-    /* Мониторы: сюда на этапах 3 и 7 встанут карта камер и Teams */
-    .monitor-left  { left: 4.07%;  top: 15.73%; width: 45.87%; height: 48.03%; }
-    .monitor-right { left: 50.84%; top: 15.73%; width: 45.57%; height: 48.03%; }
-
     /* Часы Sony: SVG в координатах фото (1672x941), цифры рисуются сегментами */
     .clock-svg {
       position: absolute;
@@ -71,46 +67,81 @@
     }
     .clock-svg .seg { fill: #14b014; }
 
-    /* ---------- карта камер на левом мониторе ---------- */
-    .monitor-left { container-type: inline-size; overflow: hidden; }
-    .cam-map { position: absolute; inset: 4% 2% 14% 2%; }
-    .cam-room {
+    /* ---------- мониторы ----------
+       Каждый монитор это холст 640x376 px, который JS (desk.js) растягивает матрицей
+       matrix3d на четырёхугольник экрана с фото. Внутри холста всё в обычных px. */
+    .mon {
       position: absolute;
-      box-sizing: border-box;
-      border: 1px solid rgba(80, 160, 80, 0.35);
-      background: rgba(40, 110, 40, 0.08);
-      border-radius: 2px;
+      left: 0;
+      top: 0;
+      width: 640px;
+      height: 376px;
+      transform-origin: 0 0;
+      overflow: hidden;
+      background: #040504;
+      color: #ececec;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+      visibility: hidden;            /* показывается после расчёта перспективы */
     }
-    .cam-room--blind { border-style: dashed; border-color: rgba(160, 160, 160, 0.3); background: transparent; }
-    .cam-room--desk {
-      display: flex; align-items: center; justify-content: center;
-      border-color: rgba(150, 200, 255, 0.5); background: transparent;
-      font-size: clamp(0.5rem, 2.2cqw, 0.9rem); color: rgba(170, 210, 255, 0.85);
+    .mon.is-ready { visibility: visible; }
+    .mon::before {                   /* статический шум, как на мониторах охраны */
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxODAnIGhlaWdodD0nMTgwJz48ZmlsdGVyIGlkPSduJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nMC44NScgbnVtT2N0YXZlcz0nMicgc3RpdGNoVGlsZXM9J3N0aXRjaCcvPjxmZUNvbG9yTWF0cml4IHR5cGU9J3NhdHVyYXRlJyB2YWx1ZXM9JzAnLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0nMTAwJScgaGVpZ2h0PScxMDAlJyBmaWx0ZXI9J3VybCgjbiknLz48L3N2Zz4=");
+      opacity: 0.12;
+      mix-blend-mode: screen;
+      pointer-events: none;
     }
-    .cam-room--nb { background: rgba(255, 200, 60, 0.18); }
-    .cam-room--hl {
-      border-color: #ffd24a;
-      background: rgba(255, 210, 74, 0.28);
-      box-shadow: 0 0 6px rgba(255, 210, 74, 0.6);
+    .mon::after {                    /* строки развёртки и виньетка */
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      background:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 1px, transparent 1px 3px),
+        radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+      pointer-events: none;
     }
+
+    /* ---------- карта камер (левый монитор) ---------- */
+    .cam-map { position: absolute; inset: 0; }
+    .cam-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .cam-svg .room { fill: none; stroke: #e8e8e8; stroke-width: 1.6; }
+    .cam-svg .room--hall { stroke: #7a7a7a; stroke-width: 1; stroke-dasharray: 5 4; }
+    .cam-svg .outline { fill: none; stroke: #e8e8e8; stroke-width: 1.6; }
+    .cam-svg .door { fill: #040504; }
+    .cam-svg .wc { fill: #8a8a8a; font-size: 10px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+    .cam-svg .you-box { fill: #ececec; }
+    .cam-svg .you-text { fill: #ececec; font-size: 11px; font-weight: 700; text-anchor: middle; }
+    .cam-svg .room--hl { stroke: #ffd24a; stroke-width: 2.4; fill: rgba(255, 210, 74, 0.22); }
+    .cam-svg .room--nb { fill: rgba(255, 210, 74, 0.12); }
     .cam-btn {
       position: absolute;
-      width: clamp(2.2rem, 6.5cqw, 3.4rem);
-      height: clamp(2.2rem, 6.5cqw, 3.4rem);
+      z-index: 2;
+      width: 62px;
+      height: 46px;
+      margin: -23px 0 0 -31px;
       padding: 0;
-      transform: translate(-50%, -50%);
-      border: 2px solid #4fbf4f;
-      border-radius: 50%;
-      background: #071007;
-      color: #8fe08f;
-      font: 700 clamp(0.8rem, 2.6cqw, 1.3rem) / 1 system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      background: #000;
+      color: #ececec;
+      border: 2px solid #ececec;
+      border-radius: 0;
+      font: 700 22px / 1 ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
       touch-action: manipulation;
     }
-    .cam-btn:active, .cam-btn--active { background: #1a4a1a; color: #fff; box-shadow: 0 0 8px #4fbf4f; }
+    .cam-btn small { font-size: 11px; font-weight: 700; line-height: 1; letter-spacing: 0.06em; }
+    .cam-btn::after { content: ""; position: absolute; inset: -5px; }   /* увеличенная зона нажатия */
+    .cam-btn:active, .cam-btn--active { background: #1f6f1f; border-color: #8dff8d; color: #fff; }
     .cam-caption {
-      position: absolute; left: 2%; right: 2%; bottom: 3%; height: 9%;
-      display: flex; align-items: center;
-      color: #8fe08f; font-size: clamp(0.65rem, 2.2cqw, 1rem);
+      position: absolute; z-index: 2; left: 18px; bottom: 12px; right: 18px;
+      font-size: 14px; font-weight: 700; letter-spacing: 0.04em;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
