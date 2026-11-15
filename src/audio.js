@@ -66,7 +66,8 @@ const stopped = new WeakSet();
 // play(soundId, { at, loop, volume }) -> handle { stop() } | null.
 // at: позиция графа; без at звук играет «в голове» игрока.
 export function play(soundId, opts = {}) {
-  if (soundId === 'jumpscare') return playJumpscare();
+  // Скример: свой MP3 из каталога; синтез только как запасной вариант, если файл не загрузился.
+  if (soundId === 'jumpscare' && !buffers.jumpscare) return playJumpscare();
   const def = catalog[soundId];
   if (!def) {
     console.warn(`audio.play: звука «${soundId}» нет в каталоге`);
@@ -156,7 +157,7 @@ export function playCall(callId) {
   return null;
 }
 
-// ---------- синтез скримера (обрыв совпадает с чёрным экраном) ----------
+// ---------- запасной синтез скримера (если jumpscare.mp3 не загрузился) ----------
 function playJumpscare() {
   if (!ctx) return null;
   if (ctx.state === 'suspended') ctx.resume();
