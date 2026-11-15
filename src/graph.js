@@ -27,7 +27,9 @@ export function loadGraph(rooms) {
     };
   }
   for (const [k, c] of Object.entries(rooms.cameras || {})) {
-    cameras[Number(k)] = { id: Number(k), name: c.name, pos: c.pos, btn: c.btn ? { ...c.btn } : null };
+    cameras[Number(k)] = {
+      id: Number(k), name: c.name, pos: c.pos, img: c.img, btn: c.btn ? { ...c.btn } : null,
+    };
   }
 }
 
@@ -95,7 +97,7 @@ export function cameraIds() {
   return Object.keys(cameras).map(Number).sort((a, b) => a - b);
 }
 
-// { id, name (ключ словаря), pos, btn: {x, y} } или undefined; btn это центр кнопки на карте
+// { id, name (ключ словаря), pos, img (путь к кадру), btn: {x, y} } или undefined; btn это центр кнопки на карте
 export function cameraMeta(cam) {
   return cameras[cam] ? { ...cameras[cam] } : undefined;
 }
@@ -122,6 +124,7 @@ export function validateGraph() {
 
   for (const cam of cameraIds()) {
     if (mapViewData && !cameras[cam].btn) issues.push(`камера ${cam}: нет положения кнопки на карте`);
+    if (!cameras[cam].img) issues.push(`камера ${cam}: нет пути к кадру (img)`);
     const own = cameras[cam].pos;
     if (!positions[own]) issues.push(`камера ${cam}: позиции «${own}» нет`);
     else if (!positions[own].cams.some((c) => c.cam === cam)) {

@@ -1,6 +1,6 @@
 // Единственный игровой цикл. Другие модули время берут только из события tick.
 
-import { state, set, emit, on, newNight } from './state.js';
+import { state, set, patch, emit, on, newNight } from './state.js';
 import { loadLang, t } from './i18n.js';
 import * as audio from './audio.js';
 import * as desk from './ui/desk.js';
@@ -62,7 +62,7 @@ on('intent:startShift', () => {
   set('running', true);
 });
 
-// Открытие камеры: пока только состояние и событие. Вид камеры — этап 4.
+// Открытие камеры: состояние и событие; вид рисует ui/cameras.js.
 on('intent:openCamera', ({ id }) => {
   if (!state.running) return;
   set('camera', id);
@@ -73,6 +73,36 @@ on('intent:closeCamera', () => {
   if (state.camera === null) return;
   set('camera', null);
   emit('camera:close');
+});
+
+// Конец смены закрывает камеру: на экране итога остаётся стол.
+on('night:end', () => {
+  if (state.camera === null) return;
+  set('camera', null);
+  emit('camera:close');
+});
+
+// ВРЕМЕННО, до этапа 7 (tickets.js): перезагрузка сломанной камеры занимает 2 с игрового времени.
+const REBOOT_SEC = 2;
+const rebooting = new Map(); // номер камеры -> сколько секунд осталось
+
+on('intent:reboot', ({ cam }) => {
+  if (!state.running || rebooting.has(cam) || !state.brokenCams.includes(cam)) return;
+  rebooting.set(cam, REBOOT_SEC);
+});
+
+on('night:start', () => rebooting.clear());
+
+on('tick', ({ dt }) => {
+  if (!state.running || !rebooting.size) return;
+  for (const [cam, left] of rebooting) {
+    if (left - dt > 0) {
+      rebooting.set(cam, left - dt);
+      continue;
+    }
+    rebooting.delete(cam);
+    patch('brokenCams', (list) => list.filter((c) => c !== cam));
+  }
 });
 
 // ---------- запуск ----------

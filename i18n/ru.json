@@ -60,5 +60,21 @@
   "debug.graph.ok": "Проверка графа: без замечаний",
   "debug.graph.issues": "Проверка графа, замечаний: {n}",
   "cams.map.cam": "CAM",
-  "cams.map.wc": "WC"
+  "cams.map.wc": "WC",
+  "cams.hud.rec": "REC",
+  "cams.hud.time": "{h}:{m} AM",
+  "cams.hud.tokens": "ТОКЕНЫ {v}%",
+  "cams.hud.load": "НАГРУЗКА {v}",
+  "cams.hud.overload": "ПЕРЕГРУЗКА СЕТИ",
+  "cams.back": "КАРТА",
+  "cams.broken.error": "ОШИБКА: НЕТ СИГНАЛА",
+  "cams.broken.reboot": "Перезагрузить",
+  "cams.broken.rebooting": "Перезагрузка…",
+  "debug.section.cameras": "Камеры",
+  "debug.cam": "Камера",
+  "debug.cam.open": "Открыть",
+  "debug.cam.close": "Закрыть",
+  "debug.cam.flash": "Вспышка",
+  "debug.cam.break": "Сломать",
+  "debug.cam.fix": "Починить"
 }

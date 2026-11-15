@@ -6,6 +6,7 @@ import { state, set, emit, on } from './state.js';
 import { t } from './i18n.js';
 import {
   positionIds, labelOf, neighbors, distance, camerasFor, isBlind, panOf, validateGraph,
+  cameraIds, cameraMeta,
 } from './graph.js';
 
 const sections = [];   // { id, titleKey, build }
@@ -173,6 +174,26 @@ function buildGraph(el) {
   el.append(h('div', { class: 'dbg-row' }, h('label', {}, t('debug.pos')), select), info, check);
 }
 
+function buildCameras(el) {
+  const select = h('select', {});
+  for (const id of cameraIds()) {
+    select.append(h('option', { value: id }, t('cams.caption', { n: id, name: t(cameraMeta(id).name) })));
+  }
+  const cam = () => Number(select.value);
+  el.append(
+    h('div', { class: 'dbg-row' }, h('label', {}, t('debug.cam')), select),
+    h('div', { class: 'dbg-btns' },
+      button('debug.cam.open', () => emit('intent:openCamera', { id: cam() })),
+      button('debug.cam.close', () => emit('intent:closeCamera')),
+      button('debug.cam.flash', () => emit('debug:flash'))),
+    h('div', { class: 'dbg-btns' },
+      button('debug.cam.break', () => {
+        if (!state.brokenCams.includes(cam())) set('brokenCams', [...state.brokenCams, cam()]);
+      }),
+      button('debug.cam.fix', () => set('brokenCams', state.brokenCams.filter((c) => c !== cam())))),
+  );
+}
+
 // ---------- публичный API ----------
 // Следующие этапы вызывают addSection('enemies', 'debug.section.enemies', el => {...}).
 export function addSection(id, titleKey, build) {
@@ -217,6 +238,7 @@ function mount() {
 addSection('shift', 'debug.section.shift', buildShift);
 addSection('resources', 'debug.section.resources', buildResources);
 addSection('graph', 'debug.section.graph', buildGraph);
+addSection('cameras', 'debug.section.cameras', buildCameras);
 
 export function initDebug() {
   if (new URLSearchParams(location.search).get('debug') === '1') {
