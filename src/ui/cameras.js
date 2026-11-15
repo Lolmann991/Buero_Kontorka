@@ -1,7 +1,9 @@
 // Левый монитор: карта камер (этап 3) и вид камеры (этап 4).
 // Только рисует и шлёт намерения. Игровой логики здесь нет.
 
-import { cameraIds, cameraMeta, mapOf, mapView, positionIds, isBlind, PLAYER_POS } from '../graph.js';
+import {
+  cameraIds, cameraMeta, mapOf, mapView, positionIds, isBlind, PLAYER_POS, camerasFor, spriteDef,
+} from '../graph.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HALLS = ['s_hall1', 's_hall2', 's_hall3'];   // сегменты одного зала: границы рисуем пунктиром
@@ -24,6 +26,10 @@ let preload = [];
 let last = {};         // последние тексты HUD, чтобы не трогать DOM зря
 let gains = {};        // автояркость по камерам (из средней яркости кадра)
 let tunes = {};        // ручная подстройка из отладочной панели
+let sprOver = {};      // подстройка спрайтов из отладки: `${pos}:${cam}` -> {x, y, scale, pose}
+let sprSig = '';       // что сейчас нарисовано в слое спрайтов
+const VISIBLE = new Set(['idle', 'dash']);   // в других статусах враг пропадает с камер
+const warned = new Set();
 
 function el(tag, className, parent) {
   const e = document.createElement(tag);
@@ -291,6 +297,46 @@ function measureGain(cam, im) {
   if (shown === cam) applyLook(cam);
 }
 
+// ---------- спрайты врагов ----------
+// Кто виден на открытой камере, решают state.enemies и graph.camerasFor(); здесь только рисуем.
+function renderSprites() {
+  if (shown === null || !els.sprites) return;
+  const list = [];
+  for (const [eid, e] of Object.entries(S.enemies)) {
+    if (!e || !VISIBLE.has(e.status ?? 'idle')) continue;
+    const entry = camerasFor(e.pos).find((c) => c.cam === shown);
+    if (!entry) continue;
+    list.push({ eid, ...entry, ...(sprOver[`${e.pos}:${shown}`] || {}) });
+  }
+  const sig = shown + '|' + JSON.stringify(list);
+  if (sig === sprSig) return;
+  sprSig = sig;
+  els.sprites.replaceChildren();
+  for (const s of list) {
+    const def = spriteDef(s.eid, s.pose);
+    if (!def) {
+      const key = `${s.eid}:${s.pose}`;
+      if (!warned.has(key)) { warned.add(key); console.warn(`cameras: нет описания позы «${s.pose}» для ${s.eid}`); }
+      continue;
+    }
+    const wrap = el('div', 'cam-spr', els.sprites);
+    if (s.clip) {
+      const { x1, y1, x2, y2 } = s.clip;
+      wrap.style.clipPath = `inset(${y1}% ${100 - x2}% ${100 - y2}% ${x1}%)`;
+    }
+    const im = el('img', '', wrap);
+    im.alt = '';
+    im.draggable = false;
+    im.src = def.img;
+    im.style.left = `${s.x}%`;
+    im.style.top = `${s.y}%`;
+    im.style.height = `${def.h * s.scale}%`;
+    im.style.transform = `translate(${-(def.ax ?? 0.5) * 100}%, -100%)`;
+    // дальние фигуры темнее
+    im.style.filter = `brightness(${(0.6 + 0.4 * Math.min(1, s.scale)).toFixed(2)})`;
+  }
+}
+
 function showView(cam) {
   const meta = cameraMeta(cam);
   if (!meta) return;
@@ -313,6 +359,7 @@ function showView(cam) {
     syncHud();
     flash();
   }
+  renderSprites();
   startNoise();
 }
 
@@ -320,6 +367,8 @@ function hideView() {
   shown = null;
   els.map?.classList.remove('is-hidden');
   els.view?.classList.remove('is-open');
+  els.sprites?.replaceChildren();
+  sprSig = '';
   stopNoise();
 }
 
@@ -376,6 +425,10 @@ export function mount(rootEl, ctx) {
     on('night:start', refresh),
     on('debug:highlight', highlight),
     on('debug:flash', () => { if (shown !== null) flash(); }),
+    on('debug:sprite', ({ pos, cam, x, y, scale, pose }) => {
+      sprOver[`${pos}:${cam}`] = { x, y, scale, pose };
+      renderSprites();
+    }),
     on('debug:tune', ({ cam, brightness, contrast }) => {
       tunes[cam] = { brightness, contrast };
       if (shown === cam) applyLook(cam);
@@ -384,6 +437,7 @@ export function mount(rootEl, ctx) {
     on('tick', () => {
       if (shown === null) return;
       syncHud();
+      renderSprites();
       const broken = isBroken(shown);
       if (broken !== els.broken) {
         els.broken = broken;
@@ -405,4 +459,6 @@ export function unmount() {
   last = {};
   gains = {};
   tunes = {};
+  sprOver = {};
+  sprSig = '';
 }

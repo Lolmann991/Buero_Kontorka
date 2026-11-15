@@ -7,12 +7,14 @@ let positions = {};   // id -> { id, label, next, pan, cams, map, walkable }
 let cameras = {};     // номер камеры -> { id, name, pos, btn }
 let mapViewData = null; // схема карты камер: размер холста, контуры, двери, место игрока
 let distCache = new Map();
+let sprites = {};     // враг -> поза -> { img, h, ax }
 
 export function loadGraph(rooms) {
   positions = {};
   cameras = {};
   mapViewData = rooms.mapView ? JSON.parse(JSON.stringify(rooms.mapView)) : null;
   distCache = new Map();
+  sprites = rooms.sprites ? JSON.parse(JSON.stringify(rooms.sprites)) : {};
   for (const [id, p] of Object.entries(rooms.positions || {})) {
     positions[id] = {
       id,
@@ -32,6 +34,17 @@ export function loadGraph(rooms) {
       btn: c.btn ? { ...c.btn } : null,
     };
   }
+}
+
+// Описание позы врага: { img, h (высота в % кадра при scale 1), ax (точка ног по ширине, 0..1) } или undefined.
+export function spriteDef(enemyId, pose) {
+  const d = sprites[enemyId]?.[pose];
+  return d ? { ...d } : undefined;
+}
+
+// Список поз врага
+export function poseIds(enemyId) {
+  return Object.keys(sprites[enemyId] || {});
 }
 
 export function positionIds() {
@@ -121,6 +134,11 @@ export function validateGraph() {
       issues.push(`${id}: поле blind не совпадает со списком камер`);
     }
     if (distance(PLAYER_POS, id) === Infinity) issues.push(`${id}: не достижима от стола`);
+    for (const c of p.cams) {
+      for (const enemy of Object.keys(sprites)) {
+        if (!sprites[enemy][c.pose]) issues.push(`${id}, камера ${c.cam}: поза «${c.pose}» не описана в sprites.${enemy}`);
+      }
+    }
   }
 
   for (const cam of cameraIds()) {

@@ -6,7 +6,7 @@ import { state, set, emit, on } from './state.js';
 import { t } from './i18n.js';
 import {
   positionIds, labelOf, neighbors, distance, camerasFor, isBlind, panOf, validateGraph,
-  cameraIds, cameraMeta,
+  cameraIds, cameraMeta, poseIds,
 } from './graph.js';
 
 const sections = [];   // { id, titleKey, build }
@@ -221,6 +221,95 @@ function buildCameras(el) {
   );
 }
 
+// Спрайты врага на камерах: поставить врага в позицию, открыть камеру, подогнать место и размер.
+// Готовые строки копируются в cams нужной позиции в rooms.json.
+function buildEnemies(el) {
+  const ENEMY = 'mr404';
+  const posSel = h('select', {});
+  posSel.append(h('option', { value: '' }, t('debug.pos.none')));
+  for (const id of positionIds()) if (id !== 'desk') posSel.append(h('option', { value: id }, t(labelOf(id))));
+  const camSel = h('select', {});
+  const poseSel = h('select', {});
+  for (const p of poseIds(ENEMY)) poseSel.append(h('option', { value: p }, p));
+  const dump = h('p', { class: 'dbg-info' }, '');
+  const tuned = {};   // `${pos}:${cam}` -> запись для rooms.json
+  let current = null; // запись, которую сейчас правим
+
+  const fields = {};
+  const row = (labelKey, field, min, max, step) => {
+    const out = h('output', {}, '');
+    const input = h('input', { type: 'range', min, max, step });
+    input.addEventListener('input', () => {
+      if (!current) return;
+      current[field] = Number(input.value);
+      out.textContent = input.value;
+      push();
+    });
+    fields[field] = { input, out };
+    return h('div', { class: 'dbg-row' }, h('label', {}, t(labelKey)), input, out);
+  };
+
+  const key = () => `${posSel.value}:${camSel.value}`;
+
+  function push() {
+    if (!current) return;
+    current.pose = poseSel.value;
+    tuned[key()] = { pos: posSel.value, ...current };
+    emit('debug:sprite', { pos: posSel.value, cam: current.cam, x: current.x, y: current.y, scale: current.scale, pose: current.pose });
+    dump.textContent = Object.values(tuned).map((e) =>
+      `${e.pos}: { "cam": ${e.cam}, "slot": ${e.slot}, "x": ${e.x}, "y": ${e.y}, "scale": ${e.scale}, "pose": "${e.pose}" }`).join('\n');
+  }
+
+  function loadEntry() {
+    current = null;
+    if (!posSel.value || !camSel.value) return;
+    const entry = camerasFor(posSel.value).find((c) => c.cam === Number(camSel.value));
+    if (!entry) return;
+    current = { ...entry, ...(tuned[key()] || {}) };
+    delete current.pos;
+    for (const f of ['x', 'y', 'scale']) {
+      fields[f].input.value = current[f];
+      fields[f].out.textContent = String(current[f]);
+    }
+    poseSel.value = current.pose;
+  }
+
+  function openCam() {
+    if (camSel.value) emit('intent:openCamera', { id: Number(camSel.value) });
+  }
+
+  posSel.addEventListener('change', () => {
+    const id = posSel.value;
+    const from = Object.values(state.enemies)[0]?.pos ?? null;
+    camSel.replaceChildren();
+    if (!id) {
+      set('enemies', {});
+      emit('enemy:moved', { id: ENEMY, from, to: null });
+      current = null;
+      return;
+    }
+    for (const c of camerasFor(id)) {
+      camSel.append(h('option', { value: c.cam }, t('cams.caption', { n: c.cam, name: t(cameraMeta(c.cam).name) })));
+    }
+    set('enemies', { [ENEMY]: { pos: id, status: 'idle' } });
+    emit('enemy:moved', { id: ENEMY, from, to: id });
+    loadEntry();
+    openCam();
+  });
+  camSel.addEventListener('change', () => { loadEntry(); openCam(); });
+  poseSel.addEventListener('change', push);
+
+  el.append(
+    h('div', { class: 'dbg-row' }, h('label', {}, t('debug.pos')), posSel),
+    h('div', { class: 'dbg-row' }, h('label', {}, t('debug.cam')), camSel),
+    h('div', { class: 'dbg-row' }, h('label', {}, t('debug.enemy.pose')), poseSel),
+    row('debug.enemy.x', 'x', 0, 100, 0.5),
+    row('debug.enemy.y', 'y', 0, 100, 0.5),
+    row('debug.enemy.scale', 'scale', 0.1, 2.5, 0.02),
+    dump,
+  );
+}
+
 function buildGlitches(el) {
   el.append(h('div', { class: 'dbg-btns' },
     button('debug.glitch.clock333', () => emit('glitch', { type: 'clock333', source: 'fifth' }))));
@@ -271,6 +360,7 @@ addSection('shift', 'debug.section.shift', buildShift);
 addSection('resources', 'debug.section.resources', buildResources);
 addSection('graph', 'debug.section.graph', buildGraph);
 addSection('cameras', 'debug.section.cameras', buildCameras);
+addSection('enemies', 'debug.section.enemies', buildEnemies);
 addSection('glitches', 'debug.section.glitches', buildGlitches);
 
 export function initDebug() {

@@ -1,5 +1,5 @@
 {
-  "_note": "Координаты спрайтов (x, y, scale, pose) и slot — заглушки до этапа 6. Поля map, mapExtra, mapView и btn — схема карты камер (холст 640×376, север слева); план повёрнут на 90° против часовой.",
+  "_note": "Координаты спрайтов (x, y, scale, pose) и slot — заглушки, подбираются в отладке (секция «Враги»). sprites: картинки поз врагов (h — высота в % кадра при scale 1, ax — где у картинки точка ног по ширине). Поля map, mapExtra, mapView и btn — схема карты камер (холст 640×376, север слева); план повёрнут на 90° против часовой.",
   "player": "desk",
   "cameras": {
     "1": {
@@ -143,6 +143,45 @@
       "tune": {
         "brightness": 0.5,
         "contrast": 1.1
+      }
+    }
+  },
+  "sprites": {
+    "mr404": {
+      "far": {
+        "img": "assets/img/enemies/mr404/far.webp",
+        "h": 70,
+        "ax": 0.5
+      },
+      "near": {
+        "img": "assets/img/enemies/mr404/near.webp",
+        "h": 70,
+        "ax": 0.45
+      },
+      "back": {
+        "img": "assets/img/enemies/mr404/back.webp",
+        "h": 70,
+        "ax": 0.5
+      },
+      "peek": {
+        "img": "assets/img/enemies/mr404/peek.webp",
+        "h": 70,
+        "ax": 0.35
+      },
+      "dash": {
+        "img": "assets/img/enemies/mr404/dash.webp",
+        "h": 70,
+        "ax": 0.3
+      },
+      "close": {
+        "img": "assets/img/enemies/mr404/close.webp",
+        "h": 85,
+        "ax": 0.5
+      },
+      "bust": {
+        "img": "assets/img/enemies/mr404/bust.webp",
+        "h": 80,
+        "ax": 0.5
       }
     }
   },

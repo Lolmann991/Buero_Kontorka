@@ -90,5 +90,10 @@
   "shutdown.right.text": "ИИ-агент недоступен. Запас токенов исчерпан.",
   "shutdown.code": "КОД 0x544F4B30",
   "shutdown.boot": "Перезагрузка системы…",
-  "shutdown.fail": "Недостаточно токенов для запуска"
+  "shutdown.fail": "Недостаточно токенов для запуска",
+  "debug.section.enemies": "Враги (спрайты)",
+  "debug.enemy.pose": "Поза",
+  "debug.enemy.x": "X, %",
+  "debug.enemy.y": "Y, % (ноги)",
+  "debug.enemy.scale": "Масштаб"
 }
