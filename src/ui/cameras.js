@@ -20,6 +20,10 @@ let root = null;
 let els = {};
 let S = null;          // state
 let T = null;          // t()
+let E = null;          // emit()
+let holdId = null;     // тикет, кнопку починки которого сейчас удерживают
+let repairSig = '';    // что сейчас нарисовано в слое кнопок починки
+let repairBtns = new Map();   // id тикета -> { btn, fill }
 let shown = null;      // номер камеры на экране или null (карта)
 let noiseTimer = null;
 let preload = [];
@@ -128,6 +132,7 @@ function buildView(parent, ctx) {
   els.img.alt = '';
   els.img.draggable = false;
   els.img.addEventListener('error', () => console.warn(`cameras: не загрузился кадр камеры ${shown}`));
+  els.world = world;
   els.sprites = el('div', 'cam-sprites', world);            // этап 6
 
   els.noise = el('canvas', 'cam-noise', els.frame);
@@ -476,10 +481,58 @@ function renderSprites() {
   }
 }
 
+// ---------- кнопки починки (этап 7) ----------
+// На камере с устройством открытого тикета (ПК, принтер) в точке тикета стоит кнопка: её нужно удерживать.
+// Отпустил раньше: прогресс сбросится (считает tickets.js). Кнопки едут вместе с дрейфом кадра.
+function endHold() {
+  if (holdId === null) return;
+  const id = holdId;
+  holdId = null;
+  repairBtns.get(id)?.btn.classList.remove('is-hold');
+  E('intent:repairEnd');
+}
+
+function renderRepair() {
+  if (!els.world) return;
+  const list = shown === null ? [] : S.tickets.filter(
+    (tk) => !tk.done && tk.cam === shown && tk.type !== 'camera' && tk.x !== null && !isBroken(shown));
+  const sig = `${shown}|${list.map((tk) => `${tk.id}:${tk.x}:${tk.y}`).join(',')}`;
+  if (sig !== repairSig) {
+    repairSig = sig;
+    if (holdId !== null && !list.some((tk) => tk.id === holdId)) endHold();
+    for (const { btn } of repairBtns.values()) btn.remove();
+    repairBtns.clear();
+    for (const tk of list) {
+      const btn = el('button', 'cam-fix', els.world);
+      btn.type = 'button';
+      btn.style.left = `${tk.x}%`;
+      btn.style.top = `${tk.y}%`;
+      const fill = el('i', '', btn);
+      el('span', '', btn).textContent = T(tk.button);
+      btn.addEventListener('pointerdown', (e) => {
+        if (e.button > 0 || holdId !== null) return;
+        e.preventDefault();
+        try { btn.setPointerCapture(e.pointerId); } catch (err) { /* не критично */ }
+        holdId = tk.id;
+        btn.classList.add('is-hold');
+        E('intent:repairStart', { ticketId: tk.id });
+      });
+      for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) btn.addEventListener(ev, endHold);
+      btn.addEventListener('contextmenu', (e) => e.preventDefault());
+      repairBtns.set(tk.id, { btn, fill });
+    }
+  }
+  for (const tk of list) {
+    const r = repairBtns.get(tk.id);
+    if (r) r.fill.style.width = `${(tk.progress * 100).toFixed(1)}%`;
+  }
+}
+
 function showView(cam) {
   const meta = cameraMeta(cam);
   if (!meta) return;
   const changed = shown !== cam;
+  if (changed) endHold();
   shown = cam;
   els.map.classList.add('is-hidden');
   els.view.classList.add('is-open');
@@ -499,15 +552,18 @@ function showView(cam) {
     flash();
   }
   renderSprites();
+  renderRepair();
   startNoise();
 }
 
 function hideView() {
+  endHold();
   shown = null;
   els.map?.classList.remove('is-hidden');
   els.view?.classList.remove('is-open');
   els.sprites?.replaceChildren();
   sprSig = '';
+  renderRepair();
   stopNoise();
 }
 
@@ -516,6 +572,7 @@ export function mount(rootEl, ctx) {
   root = rootEl;
   S = ctx.state;
   T = ctx.t;
+  E = ctx.emit;
   const { on } = ctx;
 
   els.map = buildMap(root, ctx);
@@ -577,6 +634,7 @@ export function mount(rootEl, ctx) {
       if (shown === null) return;
       syncHud();
       renderSprites();
+      renderRepair();
       const broken = isBroken(shown);
       if (broken !== els.broken) {
         els.broken = broken;
@@ -603,4 +661,7 @@ export function unmount() {
   spriteClean = {};
   sprOver = {};
   sprSig = '';
+  repairBtns = new Map();
+  repairSig = '';
+  holdId = null;
 }

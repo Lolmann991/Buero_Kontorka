@@ -8,6 +8,7 @@ import {
   positionIds, labelOf, neighbors, distance, camerasFor, isBlind, panOf, validateGraph,
   cameraIds, cameraMeta, poseIds,
 } from './graph.js';
+import { deviceList } from './tickets.js';   // только чтение списка устройств
 
 const sections = [];   // { id, titleKey, build }
 const refreshers = []; // функции, обновляющие показания из state
@@ -352,6 +353,82 @@ function buildGlitches(el) {
     button('debug.glitch.clock333', () => emit('glitch', { type: 'clock333', source: 'fifth' }))));
 }
 
+// ---------- тикеты (этап 7) ----------
+// Принудительные тикеты и подбор точек кнопок починки: двигаешь ползунки, кнопка на камере едет сразу.
+// Готовые строки копируются в data/tickets.json (devices).
+function buildTickets(el) {
+  const TYPES = ['pc', 'printer'];
+  const spawn = (type, dev = null) => emit('debug:ticket', { action: 'spawn', type, dev });
+  el.append(h('div', { class: 'dbg-btns' },
+    button('debug.tk.spawn.pc', () => spawn('pc')),
+    button('debug.tk.spawn.printer', () => spawn('printer')),
+    button('debug.tk.spawn.camera', () => spawn('camera')),
+    button('debug.tk.resolveAll', () => emit('debug:ticket', { action: 'resolveAll' }))));
+
+  const typeSel = h('select', {});
+  for (const ty of TYPES) typeSel.append(h('option', { value: ty }, ty));
+  const devSel = h('select', {});
+  const dump = h('p', { class: 'dbg-info' }, '');
+  const fields = {};
+  const row = (labelKey, field) => {
+    const out = h('output', {}, '');
+    const input = h('input', { type: 'range', min: 0, max: 100, step: 0.5 });
+    input.addEventListener('input', () => {
+      out.textContent = input.value;
+      push();
+    });
+    fields[field] = { input, out };
+    return h('div', { class: 'dbg-row' }, h('label', {}, t(labelKey)), input, out);
+  };
+
+  function push() {
+    if (devSel.value === '') return;
+    emit('debug:ticket', {
+      action: 'tune', type: typeSel.value, dev: Number(devSel.value),
+      x: Number(fields.x.input.value), y: Number(fields.y.input.value),
+    });
+    dump.textContent = deviceList(typeSel.value)
+      .map((d) => `{"cam":${d.cam},"x":${d.x},"y":${d.y}}`).join(',\n');
+  }
+
+  function loadDevice() {
+    const d = deviceList(typeSel.value).find((x) => x.dev === Number(devSel.value));
+    if (!d) return;
+    for (const f of ['x', 'y']) {
+      fields[f].input.value = d[f];
+      fields[f].out.textContent = String(d[f]);
+    }
+    dump.textContent = deviceList(typeSel.value)
+      .map((x) => `{"cam":${x.cam},"x":${x.x},"y":${x.y}}`).join(',\n');
+  }
+
+  function fillDevices() {
+    devSel.replaceChildren();
+    for (const d of deviceList(typeSel.value)) devSel.append(h('option', { value: d.dev }, `CAM ${d.cam} · #${d.dev}`));
+    loadDevice();
+  }
+
+  typeSel.addEventListener('change', fillDevices);
+  devSel.addEventListener('change', loadDevice);
+
+  el.append(
+    h('div', { class: 'dbg-row' }, h('label', {}, t('debug.tk.type')), typeSel),
+    h('div', { class: 'dbg-row' }, h('label', {}, t('debug.tk.device')), devSel),
+    row('debug.tk.x', 'x'),
+    row('debug.tk.y', 'y'),
+    h('div', { class: 'dbg-btns' }, button('debug.tk.show', () => {
+      const d = deviceList(typeSel.value).find((x) => x.dev === Number(devSel.value));
+      if (!d) return;
+      emit('intent:openCamera', { id: d.cam });
+      spawn(typeSel.value, d.dev);
+    })),
+    h('p', { class: 'dbg-info' }, t('debug.tk.json')),
+    dump);
+  fillDevices();
+  // список устройств появляется после загрузки data/tickets.json
+  setTimeout(fillDevices, 500);
+}
+
 // ---------- публичный API ----------
 // Следующие этапы вызывают addSection('enemies', 'debug.section.enemies', el => {...}).
 export function addSection(id, titleKey, build) {
@@ -399,6 +476,7 @@ addSection('graph', 'debug.section.graph', buildGraph);
 addSection('cameras', 'debug.section.cameras', buildCameras);
 addSection('enemies', 'debug.section.enemies', buildEnemies);
 addSection('mr404', 'debug.section.mr404', buildMr404);
+addSection('tickets', 'debug.section.tickets', buildTickets);
 addSection('glitches', 'debug.section.glitches', buildGlitches);
 
 export function initDebug() {

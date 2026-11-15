@@ -1,21 +1,85 @@
 {
   "1": {
-    "durationSec": 360, "startTokens": 100, "startSla": 70,
-    "tickets": { "firstAtSec": 25, "intervalSec": [40, 70], "maxActive": 2,
-      "types": ["pc", "printer", "camera"] },
-    "enemies": {
-      "mr404": {
-        "startDelaySec": 35, "pauseSec": [20, 35], "minPauseSec": 8,
-        "dashSteps": [2, 3], "stepIntervalSec": [1.0, 1.8],
-        "hourFactor": [1.0, 0.85, 0.7], "overloadFactor": 0.8, "openTicketFactor": 0.9,
-        "appetiteFactorMax": 0.3,
-        "toiletStaySec": [15, 25], "breakChance": 0.05, "breakSec": [20, 30],
-        "lure": { "callSec": 8, "cooldownSec": 25, "retreatGood": 2, "retreatMid": 1,
-          "addPauseGoodSec": 12, "addPauseMidSec": 6 },
-        "attack": { "dwellSec": 10, "warningToJumpscareSec": [3, 5] },
-        "slaGood": 60, "slaBad": 40, "whistleChancePer10s": 0.1
+    "durationSec": 360,
+    "startTokens": 100,
+    "startSla": 70,
+    "tickets": {
+      "firstAtSec": 25,
+      "intervalSec": [
+        40,
+        70
+      ],
+      "maxActive": 2,
+      "types": [
+        "pc",
+        "printer",
+        "camera"
+      ],
+      "fastSec": 60,
+      "slowSec": 120,
+      "pressureAfterSec": 75,
+      "rating": {
+        "fast": 6,
+        "slow": 2,
+        "missed": -10
       }
     },
-    "storyCalls": ["call_n1"], "minigame": "mg_n1"
+    "enemies": {
+      "mr404": {
+        "startDelaySec": 35,
+        "pauseSec": [
+          20,
+          35
+        ],
+        "minPauseSec": 8,
+        "dashSteps": [
+          2,
+          3
+        ],
+        "stepIntervalSec": [
+          1.0,
+          1.8
+        ],
+        "hourFactor": [
+          1.0,
+          0.85,
+          0.7
+        ],
+        "overloadFactor": 0.8,
+        "openTicketFactor": 0.9,
+        "appetiteFactorMax": 0.3,
+        "toiletStaySec": [
+          15,
+          25
+        ],
+        "breakChance": 0.05,
+        "breakSec": [
+          20,
+          30
+        ],
+        "lure": {
+          "callSec": 8,
+          "cooldownSec": 25,
+          "retreatGood": 2,
+          "retreatMid": 1,
+          "addPauseGoodSec": 12,
+          "addPauseMidSec": 6
+        },
+        "attack": {
+          "dwellSec": 10,
+          "warningToJumpscareSec": [
+            3,
+            5
+          ]
+        },
+        "slaGood": 60,
+        "slaBad": 40,
+        "whistleChancePer10s": 0.1
+      }
+    },
+    "storyCalls": [
+      "call_n1"
+    ],
+    "minigame": "mg_n1"
   }
 }

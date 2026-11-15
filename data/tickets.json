@@ -1,0 +1,92 @@
+{
+  "types": {
+    "pc": {
+      "text": [
+        "tickets.pc.1",
+        "tickets.pc.2",
+        "tickets.pc.3"
+      ],
+      "button": "agent.update",
+      "holdSec": 3,
+      "weight": 40,
+      "devices": [
+        {
+          "cam": 3,
+          "x": 62,
+          "y": 83
+        },
+        {
+          "cam": 5,
+          "x": 22,
+          "y": 69
+        },
+        {
+          "cam": 5,
+          "x": 38,
+          "y": 71
+        },
+        {
+          "cam": 5,
+          "x": 56,
+          "y": 57
+        },
+        {
+          "cam": 5,
+          "x": 64,
+          "y": 56
+        },
+        {
+          "cam": 6,
+          "x": 58,
+          "y": 53
+        },
+        {
+          "cam": 6,
+          "x": 67,
+          "y": 60
+        }
+      ]
+    },
+    "printer": {
+      "text": [
+        "tickets.printer.1",
+        "tickets.printer.2"
+      ],
+      "button": "agent.reboot",
+      "holdSec": 2,
+      "weight": 30,
+      "devices": [
+        {
+          "cam": 3,
+          "x": 29,
+          "y": 48
+        }
+      ]
+    },
+    "camera": {
+      "text": [
+        "tickets.camera.1",
+        "tickets.camera.2"
+      ],
+      "button": "agent.reboot",
+      "holdSec": 2,
+      "weight": 30,
+      "devices": "any"
+    }
+  },
+  "senders": [
+    "teams.sender.1",
+    "teams.sender.2",
+    "teams.sender.3",
+    "teams.sender.4",
+    "teams.sender.5",
+    "teams.sender.6"
+  ],
+  "pressure": [
+    "tickets.pressure.1",
+    "tickets.pressure.2",
+    "tickets.pressure.3",
+    "tickets.pressure.4",
+    "tickets.pressure.5"
+  ]
+}

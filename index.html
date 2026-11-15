@@ -454,6 +454,87 @@
     .cam-sbtn:active, .cam-sbtn--active, .cam-back:active { background: #1f6f1f; border-color: #8dff8d; color: #fff; }
     .cam-back { margin-top: auto; font-size: 14px; }
 
+    /* ---------- Teams (правый монитор, этап 7) ---------- */
+    .tm { position: absolute; inset: 0; display: flex; flex-direction: column; background: #1b1b28; color: #e6e6f0;
+      font: 13px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+    .tm [hidden] { display: none !important; }
+    .tm-top { flex: none; height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+      background: #464eb8; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4); }
+    .tm-logo { width: 24px; height: 24px; border-radius: 5px; background: #2b2f7a; display: grid; place-items: center;
+      font-weight: 800; color: #fff; }
+    .tm-title { font-weight: 700; letter-spacing: 0.02em; }
+    .tm-overload { margin-left: 4px; padding: 3px 8px; border-radius: 4px; background: #5a0d0d; border: 1px solid #ff4040;
+      color: #ff6b6b; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; animation: tm-blink 0.9s steps(2) infinite; }
+    @keyframes tm-blink { 50% { opacity: 0.25; } }
+    .tm-sla { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 11px; }
+    .tm-sla__label { opacity: 0.85; }
+    .tm-sla__bar { width: 86px; height: 8px; border-radius: 4px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
+    .tm-sla__bar i { display: block; height: 100%; width: 0; background: #3ecf6a; transition: width 0.3s; }
+    .tm-sla__bar i.is-mid { background: #f0b840; }
+    .tm-sla__bar i.is-bad { background: #ff4a4a; }
+    .tm-sla__num { min-width: 24px; text-align: right; font-size: 14px; }
+    .tm-body { flex: 1; display: flex; min-height: 0; }
+    .tm-side { flex: none; width: 112px; background: #232336; padding: 8px 0; display: flex; flex-direction: column; gap: 2px; }
+    .tm-tab { position: relative; height: 44px; padding: 0 12px; border: 0; background: transparent; color: #b8b8d0;
+      font: inherit; text-align: left; cursor: pointer; border-left: 3px solid transparent; }
+    .tm-tab.is-active { background: #2e2e48; color: #fff; border-left-color: #7b83eb; font-weight: 700; }
+    .tm-dot { position: absolute; right: 10px; top: 16px; width: 9px; height: 9px; border-radius: 50%; background: #ff4a4a; }
+    .tm-main { position: relative; flex: 1; min-width: 0; }
+    .tm-feed { position: absolute; left: 0; right: 0; top: 0; bottom: 22px; display: flex; flex-direction: column;
+      justify-content: flex-end; gap: 6px; padding: 8px 10px 4px; overflow: hidden; }
+    .tm-empty { margin: auto; color: #77779a; font-size: 13px; }
+    .tm-card, .tm-msg { flex: none; display: flex; gap: 9px; padding: 7px 10px; border-radius: 6px; background: #2a2a3f;
+      border-left: 3px solid #7b83eb; }
+    .tm-msg { background: #2b2127; border-left-color: #a33; }
+    .tm-msg .tm-text { color: #f0c4c4; }
+    .tm-card.is-done { opacity: 0.55; border-left-color: #3ecf6a; }
+    .tm-card.is-missed { opacity: 0.75; border-left-color: #ff4a4a; }
+    .tm-avatar { flex: none; width: 28px; height: 28px; border-radius: 50%; background: #5b5fc7; display: grid; place-items: center;
+      font-weight: 700; color: #fff; }
+    .tm-card__body { flex: 1; min-width: 0; }
+    .tm-card__head { display: flex; justify-content: space-between; gap: 8px; }
+    .tm-name { font-weight: 700; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tm-time { flex: none; color: #8a8aa8; font-size: 11px; }
+    .tm-text { font-size: 13px; overflow-wrap: anywhere; }
+    .tm-card__foot { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .tm-badge { flex: none; padding: 1px 7px; border-radius: 9px; background: #3a3a58; font-size: 10px; font-weight: 700;
+      letter-spacing: 0.04em; text-transform: uppercase; }
+    .tm-card.is-done .tm-badge { background: #1f5a33; color: #9ff0b6; }
+    .tm-card.is-missed .tm-badge { background: #5a1f1f; color: #ff9a9a; }
+    .tm-age { flex: 1; height: 4px; border-radius: 2px; background: #1b1b28; overflow: hidden; }
+    .tm-age i { display: block; height: 100%; width: 0; background: #4a6cff; }
+    .tm-age i.is-warm { background: #f0b840; }
+    .tm-age i.is-hot { background: #ff4a4a; }
+    .tm-typing { position: absolute; left: 12px; bottom: 3px; height: 18px; display: flex; align-items: center; gap: 6px;
+      color: #8a8aa8; font-size: 11px; font-style: italic; }
+    .tm-dots { display: inline-flex; gap: 3px; }
+    .tm-dots i { width: 4px; height: 4px; border-radius: 50%; background: #8a8aa8; animation: tm-dot 1s infinite; }
+    .tm-dots i:nth-child(2) { animation-delay: 0.15s; }
+    .tm-dots i:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes tm-dot { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+    .tm-arch { position: absolute; inset: 0; padding: 8px 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+      touch-action: pan-y; }
+    .tm-arch__hint { flex: none; color: #77779a; font-size: 11px; }
+    .tm-arch__item { flex: none; padding: 7px 10px; border-radius: 6px; background: #25253a; }
+    .tm-arch__head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+    .tm-arch__head .tm-time { margin-left: auto; }
+    .tm-chip { padding: 1px 7px; border-radius: 9px; background: #343458; font-size: 10px; font-weight: 700; }
+    .tm-arch__locked { flex: none; padding: 8px; text-align: center; color: #5c5c7a; font-size: 12px; border: 1px dashed #3a3a58;
+      border-radius: 6px; }
+    @media (prefers-reduced-motion: reduce) { .tm-overload, .tm-dots i { animation: none; } }
+
+    /* кнопка починки на камере (внутри .cam-world, едет вместе с кадром) */
+    .cam-fix { position: absolute; transform: translate(-50%, -50%); min-width: 74px; height: 30px; padding: 0 10px;
+      border: 2px solid #fff; border-radius: 6px; background: rgba(0, 0, 0, 0.78); color: #fff; font: 700 11px/1 system-ui, sans-serif;
+      letter-spacing: 0.04em; text-transform: uppercase; overflow: hidden; touch-action: none; cursor: pointer;
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; animation: cam-fix-pulse 1.2s ease-in-out infinite; }
+    .cam-fix::after { content: ""; position: absolute; inset: -14px; }   /* зона нажатия больше видимой рамки */
+    .cam-fix span { position: relative; z-index: 1; }
+    .cam-fix i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #2fae4e; }
+    .cam-fix.is-hold { animation: none; border-color: #8dff8d; }
+    @keyframes cam-fix-pulse { 50% { border-color: #ffd34a; } }
+    @media (prefers-reduced-motion: reduce) { .cam-fix { animation: none; } }
+
     /* ---------- скример ---------- */
     .scare { position: absolute; inset: 0; z-index: 8; background: #000; overflow: hidden; pointer-events: auto; }
     .scare[hidden] { display: none; }

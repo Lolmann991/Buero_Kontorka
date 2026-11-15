@@ -1,0 +1,34 @@
+[
+  {
+    "id": "a001",
+    "unlockNight": 1,
+    "channel": "archive.channel.general",
+    "author": "archive.author.hr",
+    "time": "09:14",
+    "text": "archive.a001.text"
+  },
+  {
+    "id": "a002",
+    "unlockNight": 1,
+    "channel": "archive.channel.it",
+    "author": "archive.author.admin",
+    "time": "11:40",
+    "text": "archive.a002.text"
+  },
+  {
+    "id": "a003",
+    "unlockNight": 1,
+    "channel": "archive.channel.general",
+    "author": "archive.author.ceo",
+    "time": "16:02",
+    "text": "archive.a003.text"
+  },
+  {
+    "id": "a004",
+    "unlockNight": 2,
+    "channel": "archive.channel.it",
+    "author": "archive.author.admin",
+    "time": "23:51",
+    "text": "archive.a004.text"
+  }
+]

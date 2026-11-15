@@ -5,6 +5,8 @@ import { loadLang, t } from './i18n.js';
 import * as audio from './audio.js';
 import * as desk from './ui/desk.js';
 import * as cameras from './ui/cameras.js';
+import * as teams from './ui/teams.js';
+import * as tickets from './tickets.js';
 import * as graph from './graph.js';
 import * as mr404 from './enemies/mr404.js';
 import { initDebug } from './debug.js';
@@ -76,6 +78,7 @@ on('intent:startShift', () => {
 // Открытие камеры: состояние и событие; вид рисует ui/cameras.js.
 on('intent:openCamera', ({ id }) => {
   if (!state.running || state.tokens <= 0) return;
+  if (state.repairing && state.camera !== id) set('repairing', false);   // кнопка починки осталась на прошлой камере
   set('camera', id);
   recalcLoad();
   emit('camera:open', { id });
@@ -83,6 +86,7 @@ on('intent:openCamera', ({ id }) => {
 
 on('intent:closeCamera', () => {
   if (state.camera === null) return;
+  if (state.repairing) set('repairing', false);
   set('camera', null);
   recalcLoad();
   emit('camera:close');
@@ -132,7 +136,7 @@ on('intent:call', () => {
   emit('call:start', { id: 'lure', kind: 'lure' });
 });
 
-// Удержание кнопки починки даёт +1 к нагрузке. Прогресс тикета считает tickets.js (этап 7).
+// Удержание кнопки починки даёт +1 к нагрузке. Прогресс тикета считает tickets.js.
 on('intent:repairStart', () => {
   if (!state.running || state.tokens <= 0 || state.repairing) return;
   set('repairing', true);
@@ -218,27 +222,13 @@ on('jumpscare', ({ enemyId }) => {
 
 on('night:end', () => { enemies = []; });
 
-// ВРЕМЕННО, до этапа 7 (tickets.js): перезагрузка сломанной камеры занимает 2 с игрового времени.
-const REBOOT_SEC = 2;
-const rebooting = new Map(); // номер камеры -> сколько секунд осталось
-
-on('intent:reboot', ({ cam }) => {
-  if (!state.running || rebooting.has(cam) || !state.brokenCams.includes(cam)) return;
-  rebooting.set(cam, REBOOT_SEC);
-});
-
-on('night:start', () => rebooting.clear());
+// ---------- тикеты (этап 7) ----------
+// Создание, рейтинг, поломка камер, починка и перезагрузка живут в tickets.js; здесь только проводка.
+on('night:start', () => tickets.start(nights[state.night]?.tickets ?? {}));
 
 on('tick', ({ dt }) => {
-  if (!state.running || !rebooting.size) return;
-  for (const [cam, left] of rebooting) {
-    if (left - dt > 0) {
-      rebooting.set(cam, left - dt);
-      continue;
-    }
-    rebooting.delete(cam);
-    patch('brokenCams', (list) => list.filter((c) => c !== cam));
-  }
+  if (!state.running) return;
+  tickets.update(dt);
 });
 
 // ---------- запуск ----------
@@ -257,9 +247,21 @@ async function boot() {
     console.warn('nights.json не загружен, берутся значения по умолчанию', e);
   }
 
+  try {
+    tickets.load(await loadJSON('data/tickets.json'));
+  } catch (e) {
+    console.warn('tickets.json не загружен, тикеты отключены', e);
+  }
+  try {
+    teams.setArchive(await loadJSON('data/teams-archive.json'));
+  } catch (e) {
+    console.warn('teams-archive.json не загружен, архив пуст', e);
+  }
+
   const ctx = { state, t, emit, on };
   desk.mount(document.getElementById('app'), ctx);
   cameras.mount(document.getElementById('monitor-left'), ctx);
+  teams.mount(document.getElementById('monitor-right'), ctx);
   initDebug();
 
   requestAnimationFrame(frame);
