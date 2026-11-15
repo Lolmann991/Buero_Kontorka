@@ -64,6 +64,7 @@ function layoutMonitors() {
 const DIGIT_SEGMENTS = {
   '0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc',
   '5': 'afgcd', '6': 'afgedc', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg',
+  A: 'abcefg', M: 'abcefm',   // m: добавочный центральный сегмент, нужен для буквы M
 };
 
 // Шесть точек сегмента в локальных координатах (y вверх) -> строка для SVG (y вниз).
@@ -84,6 +85,7 @@ function segmentPoints() {
     a: str(horiz(T)), g: str(horiz(M)), d: str(horiz(B)),
     f: str(vert(L, M, T)), b: str(vert(R, M, T)),
     e: str(vert(L, B, M)), c: str(vert(R, B, M)),
+    m: str(vert((L + R) / 2, M, T)),
   };
 }
 
@@ -110,7 +112,7 @@ function buildClock(parent) {
   const cells = CLOCK.cells.map(([x, y]) => {
     const g = svgEl('g', { transform: `translate(${x} ${y}) rotate(${rotate}) skewX(${-skew})` }, root);
     const segs = {};
-    for (const key of 'abcdefg') segs[key] = svgEl('polygon', { class: 'seg', points: pts[key] }, g);
+    for (const key of 'abcdefgm') segs[key] = svgEl('polygon', { class: 'seg', points: pts[key] }, g);
     return segs;
   });
 
@@ -123,13 +125,13 @@ function buildClock(parent) {
   return { cells, colon: cg };
 }
 
-// Лицо часов Sony: только час («12», « 1»), минутные цифры и двоеточие погашены (AM горит на самом фото).
+// Лицо часов Sony: «12AM», « 1AM» … « 6AM». Минут и двоеточия нет.
 // На время глюка (ночь 5, 3:33) загораются минуты: « 3:33».
 export function clockFace(timeSec, glitch = false) {
   if (glitch) return { chars: [' ', '3', '3', '3'], colon: true };
   const hour = Math.min(6, Math.floor(timeSec / 60));
   const s = String(hour === 0 ? 12 : hour).padStart(2, ' ');
-  return { chars: [s[0], s[1], ' ', ' '], colon: false };
+  return { chars: [s[0], s[1], 'A', 'M'], colon: false };
 }
 
 // ---------- модуль ----------
@@ -152,7 +154,7 @@ function renderClock(state) {
   shownText = key;
   face.chars.forEach((ch, i) => {
     const lit = DIGIT_SEGMENTS[ch] || '';
-    for (const k of 'abcdefg') {
+    for (const k of 'abcdefgm') {
       els.cells[i][k].setAttribute('visibility', lit.includes(k) ? 'visible' : 'hidden');
     }
   });
