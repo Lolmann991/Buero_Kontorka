@@ -70,6 +70,7 @@ on('tick', ({ dt }) => {
 on('intent:startShift', () => {
   if (state.running) return;
   audio.init();
+  audio.setAmbient(['amb_pc_hum', 'amb_night']);
   newNight(state.night, nights[state.night] || {});
   lastHour = 0;
   set('running', true);
@@ -238,6 +239,22 @@ on('tick', ({ dt }) => {
   tickets.update(dt);
 });
 
+// ---------- звуки интерфейса ----------
+let alarm = null;
+on('camera:open', () => audio.play('cam_switch'));
+on('ticket:new', () => audio.play('teams_ping'));
+on('ticket:resolved', () => audio.play('repair_done'));
+on('ticket:missed', () => audio.play('teams_pressure'));
+on('glitch', ({ source }) => { if (source === 'ai') audio.play('glitch_ai'); });
+on('load:change', ({ overload }) => {
+  if (overload && !alarm) alarm = audio.play('overload_alarm');
+  else if (!overload && alarm) { audio.stop(alarm); alarm = null; }
+});
+on('night:end', () => {
+  audio.setAmbient([]);
+  if (alarm) { audio.stop(alarm); alarm = null; }
+});
+
 // ---------- запуск ----------
 async function loadJSON(path) {
   const res = await fetch(new URL(path, document.baseURI));
@@ -248,6 +265,11 @@ async function loadJSON(path) {
 async function boot() {
   await loadLang('ru');
   graph.loadGraph(await loadJSON('data/rooms.json'));
+  try {
+    audio.loadCatalog(await loadJSON('data/sounds.json'));
+  } catch (e) {
+    console.warn('sounds.json не загружен, звука не будет', e);
+  }
   try {
     nights = await loadJSON('data/nights.json');
   } catch (e) {
