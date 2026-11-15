@@ -95,5 +95,6 @@
   "debug.enemy.pose": "Поза",
   "debug.enemy.x": "X, %",
   "debug.enemy.y": "Y, % (ноги)",
-  "debug.enemy.scale": "Масштаб"
+  "debug.enemy.scale": "Масштаб",
+  "debug.enemy.light": "Свет (яркость)"
 }

@@ -255,9 +255,9 @@ function buildEnemies(el) {
     if (!current) return;
     current.pose = poseSel.value;
     tuned[key()] = { pos: posSel.value, ...current };
-    emit('debug:sprite', { pos: posSel.value, cam: current.cam, x: current.x, y: current.y, scale: current.scale, pose: current.pose });
+    emit('debug:sprite', { pos: posSel.value, cam: current.cam, x: current.x, y: current.y, scale: current.scale, pose: current.pose, light: current.light });
     dump.textContent = Object.values(tuned).map((e) =>
-      `${e.pos}: { "cam": ${e.cam}, "slot": ${e.slot}, "x": ${e.x}, "y": ${e.y}, "scale": ${e.scale}, "pose": "${e.pose}" }`).join('\n');
+      `${e.pos}: { "cam": ${e.cam}, "slot": ${e.slot}, "x": ${e.x}, "y": ${e.y}, "scale": ${e.scale}, "pose": "${e.pose}"${e.light !== 1 ? `, "light": ${e.light}` : ''} }`).join('\n');
   }
 
   function loadEntry() {
@@ -267,7 +267,8 @@ function buildEnemies(el) {
     if (!entry) return;
     current = { ...entry, ...(tuned[key()] || {}) };
     delete current.pos;
-    for (const f of ['x', 'y', 'scale']) {
+    current.light = current.light ?? 1;
+    for (const f of ['x', 'y', 'scale', 'light']) {
       fields[f].input.value = current[f];
       fields[f].out.textContent = String(current[f]);
     }
@@ -306,6 +307,7 @@ function buildEnemies(el) {
     row('debug.enemy.x', 'x', 0, 100, 0.5),
     row('debug.enemy.y', 'y', 0, 100, 0.5),
     row('debug.enemy.scale', 'scale', 0.1, 2.5, 0.02),
+    row('debug.enemy.light', 'light', 0.2, 2, 0.05),
     dump,
   );
 }

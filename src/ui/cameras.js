@@ -30,6 +30,9 @@ let sprOver = {};      // подстройка спрайтов из отлад�
 let sprSig = '';       // что сейчас нарисовано в слое спрайтов
 const VISIBLE = new Set(['idle', 'dash']);   // в других статусах враг пропадает с камер
 const warned = new Set();
+const LIGHT_K = 1.15;       // насколько враг ярче фона вокруг него (1 = ровно как фон)
+let grids = {};            // сетка яркости 32x24 исходного кадра каждой камеры
+let spriteInfo = {};       // картинка позы -> { ready, luma, aspect }
 
 function el(tag, className, parent) {
   const e = document.createElement(tag);
@@ -291,6 +294,11 @@ function measureGain(cam, im) {
     for (let i = 0; i < d.length; i += 4) sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
     const mean = sum / (d.length / 4);
     gains[cam] = Math.min(AUTO_GAIN_MAX, Math.max(1, AUTO_LUMA / Math.max(mean, 0.01)));
+    const grid = new Float32Array(32 * 24);
+    for (let i = 0; i < grid.length; i++) {
+      grid[i] = (0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2]) / 255;
+    }
+    grids[cam] = grid;
   } catch (e) {
     console.warn(`cameras: не удалось измерить яркость кадра ${cam}`, e);
   }
@@ -298,6 +306,60 @@ function measureGain(cam, im) {
 }
 
 // ---------- спрайты врагов ----------
+// Яркость врага подгоняется под освещение кадра вокруг него: тёмный угол даёт тёмную фигуру.
+// Средняя яркость и пропорции картинки позы (по альфе), считаются один раз при загрузке.
+function spriteStats(src) {
+  const rec = spriteInfo[src];
+  if (rec) return rec.ready ? rec : null;
+  spriteInfo[src] = { ready: false, luma: 0.3, aspect: 0.4 };
+  const im = new Image();
+  im.onload = () => {
+    const r = spriteInfo[src];
+    if (!r) return;
+    r.aspect = im.naturalWidth / im.naturalHeight;
+    try {
+      const w = 32;
+      const h = Math.max(1, Math.round(w / r.aspect));
+      const cv = document.createElement('canvas');
+      cv.width = w;
+      cv.height = h;
+      const cx = cv.getContext('2d', { willReadFrequently: true });
+      cx.drawImage(im, 0, 0, w, h);
+      const d = cx.getImageData(0, 0, w, h).data;
+      let sum = 0;
+      let wsum = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const a = d[i + 3] / 255;
+        sum += a * (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+        wsum += a;
+      }
+      if (wsum > 0) r.luma = Math.max(0.05, sum / wsum);
+    } catch (e) {
+      console.warn('cameras: не удалось измерить яркость спрайта', e);
+    }
+    r.ready = true;
+    sprSig = '';
+    renderSprites();
+  };
+  im.src = src;
+  return null;
+}
+
+// Средняя яркость исходного кадра там, где стоит фигура (область тела).
+function localLuma(cam, x, y, hPct, wPct) {
+  const g = grids[cam];
+  if (!g) return 0.2;
+  const clamp = (v) => Math.min(100, Math.max(0, v));
+  const x0 = Math.floor((clamp(x - wPct * 0.35) / 100) * 31);
+  const x1 = Math.ceil((clamp(x + wPct * 0.35) / 100) * 31);
+  const y0 = Math.floor((clamp(y - hPct * 0.85) / 100) * 23);
+  const y1 = Math.ceil((clamp(y - hPct * 0.05) / 100) * 23);
+  let sum = 0;
+  let n = 0;
+  for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) { sum += g[j * 32 + i]; n++; }
+  return n ? sum / n : 0.2;
+}
+
 // Кто виден на открытой камере, решают state.enemies и graph.camerasFor(); здесь только рисуем.
 function renderSprites() {
   if (shown === null || !els.sprites) return;
@@ -324,16 +386,26 @@ function renderSprites() {
       const { x1, y1, x2, y2 } = s.clip;
       wrap.style.clipPath = `inset(${y1}% ${100 - x2}% ${100 - y2}% ${x1}%)`;
     }
+    const st = spriteStats(def.img) || { luma: 0.3, aspect: 0.4 };
+    const hPct = def.h * s.scale;
+    const wPct = hPct * 0.75 * st.aspect;        // кадр 4:3: высота в % высоты -> ширина в % ширины
+    const local = localLuma(shown, s.x, s.y, hPct, wPct);
+    const b = Math.min(1, Math.max(0.25, (local * LIGHT_K * (s.light ?? 1)) / st.luma));
+    // тень под ногами: фигура стоит на полу, а не висит над кадром
+    const sh = el('div', 'cam-spr__shadow', wrap);
+    sh.style.left = `${s.x}%`;
+    sh.style.top = `${s.y}%`;
+    sh.style.width = `${(wPct * 0.9).toFixed(1)}%`;
     const im = el('img', '', wrap);
     im.alt = '';
     im.draggable = false;
     im.src = def.img;
     im.style.left = `${s.x}%`;
     im.style.top = `${s.y}%`;
-    im.style.height = `${def.h * s.scale}%`;
+    im.style.height = `${hPct}%`;
     im.style.transform = `translate(${-(def.ax ?? 0.5) * 100}%, -100%)`;
-    // дальние фигуры темнее
-    im.style.filter = `brightness(${(0.6 + 0.4 * Math.min(1, s.scale)).toFixed(2)})`;
+    // мягче и темнее, как всё остальное в кадре камеры
+    im.style.filter = `brightness(${b.toFixed(2)}) contrast(0.9) blur(0.5px)`;
   }
 }
 
@@ -425,8 +497,8 @@ export function mount(rootEl, ctx) {
     on('night:start', refresh),
     on('debug:highlight', highlight),
     on('debug:flash', () => { if (shown !== null) flash(); }),
-    on('debug:sprite', ({ pos, cam, x, y, scale, pose }) => {
-      sprOver[`${pos}:${cam}`] = { x, y, scale, pose };
+    on('debug:sprite', ({ pos, cam, x, y, scale, pose, light }) => {
+      sprOver[`${pos}:${cam}`] = { x, y, scale, pose, light };
       renderSprites();
     }),
     on('debug:tune', ({ cam, brightness, contrast }) => {
@@ -459,6 +531,8 @@ export function unmount() {
   last = {};
   gains = {};
   tunes = {};
+  grids = {};
+  spriteInfo = {};
   sprOver = {};
   sprSig = '';
 }

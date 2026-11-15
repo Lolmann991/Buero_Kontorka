@@ -301,6 +301,8 @@
     .cam-img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: cover; }
     .cam-sprites { position: absolute; inset: 0; }     /* спрайты врагов, координаты в % кадра */
     .cam-spr { position: absolute; inset: 0; pointer-events: none; }
+    .cam-spr__shadow { position: absolute; height: 4%; transform: translate(-50%, -50%); border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.7), transparent 70%); filter: blur(2px); }
     .cam-spr img { position: absolute; display: block; width: auto; max-width: none; transform-origin: 50% 100%;
       -webkit-user-select: none; user-select: none; }
     .cam-noise {
