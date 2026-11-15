@@ -1,7 +1,14 @@
-// Звук. На этапе 1 здесь только разблокировка AudioContext по первому касанию.
-// Полная версия (позиции, панорама, фильтр, звонки) — этап 8.
+// Звук (этап 8, раздел 12 мастер-промпта): каталог data/sounds.json, MP3 через Web Audio.
+// Громкость, фильтр и панорама считаются по расстоянию позиции звука до игрока (graph.distance).
+
+import { distance, panOf, PLAYER_POS } from './graph.js';
 
 let ctx = null;
+let master = null;
+const catalog = {};     // id -> { file, kind, loop, volume }
+const buffers = {};     // id -> AudioBuffer
+let ambient = [];       // [{ id, handle }]
+let loading = null;
 
 // Вызывать только из обработчика касания.
 export function init() {
@@ -16,12 +23,16 @@ export function init() {
   }
   ctx = new AC();
   ctx.resume();
+  master = ctx.createGain();
+  master.gain.value = 1;
+  master.connect(ctx.destination);
   // Тихий буфер: страховка для iOS, чтобы контекст точно проснулся.
   const buf = ctx.createBuffer(1, 1, 22050);
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.connect(ctx.destination);
   src.start(0);
+  decodeAll();
   return ctx;
 }
 
@@ -29,13 +40,124 @@ export function getContext() {
   return ctx;
 }
 
-// ---------- минимальный синтез для скримера (до этапа 8 с настоящими MP3) ----------
-// play(soundId, opts) -> { stop() } | null. Пока знает только 'jumpscare' (без позиции, «в голове» игрока).
-export function play(soundId) {
-  if (soundId !== 'jumpscare') {
-    console.warn(`audio.play: звук «${soundId}» пока не реализован`);
+// Читает каталог звуков (вызывается при загрузке игры, до касания).
+export function loadCatalog(list) {
+  list.forEach((s) => { catalog[s.id] = s; });
+  if (ctx) decodeAll();
+}
+
+// Загрузка и декодирование MP3. Начинается после первого касания (нужен ctx).
+function decodeAll() {
+  if (loading || !ctx) return loading;
+  loading = Promise.all(Object.values(catalog).map(async (s) => {
+    try {
+      const res = await fetch(new URL(s.file, document.baseURI));
+      if (!res.ok) throw new Error(res.status);
+      buffers[s.id] = await ctx.decodeAudioData(await res.arrayBuffer());
+    } catch (e) {
+      console.warn(`audio: не загрузился звук «${s.id}» (${s.file})`, e);
+    }
+  }));
+  return loading;
+}
+
+const stopped = new WeakSet();
+
+// play(soundId, { at, loop, volume }) -> handle { stop() } | null.
+// at: позиция графа; без at звук играет «в голове» игрока.
+export function play(soundId, opts = {}) {
+  if (soundId === 'jumpscare') return playJumpscare();
+  const def = catalog[soundId];
+  if (!def) {
+    console.warn(`audio.play: звука «${soundId}» нет в каталоге`);
     return null;
   }
+  if (!ctx) return null;
+  if (ctx.state === 'suspended') ctx.resume();
+
+  const handle = { stop() { stopHandle(handle); } };
+  handle._id = soundId;
+  handle._opts = opts;
+  handle._def = def;
+  const buf = buffers[soundId];
+  if (!buf) {
+    // ещё декодируется: стартуем, когда будет готово (петли и недавние звуки не теряются)
+    (loading || Promise.resolve()).then(() => {
+      if (!stopped.has(handle) && buffers[soundId]) startHandle(handle, buffers[soundId]);
+    });
+    return handle;
+  }
+  startHandle(handle, buf);
+  return handle;
+}
+
+function startHandle(handle, buf) {
+  const { at, loop, volume } = handle._opts;
+  const def = handle._def;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.loop = loop ?? def.loop;
+
+  let node = src;
+  let gainVal = (volume ?? 1) * (def.volume ?? 1);
+  if (at) {
+    const d = distance(at, PLAYER_POS);
+    const steps = Number.isFinite(d) ? d : 6;
+    gainVal *= Math.max(0.1, 1 - 0.2 * steps);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = Math.max(500, 8000 - 1300 * steps);
+    node.connect(lp);
+    node = lp;
+    if (ctx.createStereoPanner) {
+      const pan = ctx.createStereoPanner();
+      pan.pan.value = panOf(at) || 0;
+      node.connect(pan);
+      node = pan;
+    }
+  }
+  const g = ctx.createGain();
+  g.gain.value = gainVal;
+  node.connect(g);
+  g.connect(master);
+  src.onended = () => { try { g.disconnect(); } catch (e) { /* уже отключён */ } };
+  src.start(0);
+  handle._src = src;
+  handle._gain = g;
+}
+
+function stopHandle(handle) {
+  stopped.add(handle);
+  try { handle._src?.stop(); } catch (e) { /* уже остановлен */ }
+}
+
+export function stop(handle) {
+  handle?.stop?.();
+}
+
+// Фон: список id (петли). Меняет набор: лишнее гасит, недостающее запускает.
+export function setAmbient(list) {
+  const want = new Set(list);
+  ambient = ambient.filter((a) => {
+    if (want.has(a.id)) return true;
+    stop(a.handle);
+    return false;
+  });
+  list.forEach((id) => {
+    if (ambient.some((a) => a.id === id)) return;
+    const handle = play(id, { loop: true });
+    if (handle) ambient.push({ id, handle });
+  });
+}
+
+// Звонки (запись + субтитры): появятся вместе с calls.json.
+export function playCall(callId) {
+  console.warn(`audio.playCall: звонок «${callId}» пока не реализован`);
+  return null;
+}
+
+// ---------- синтез скримера (обрыв совпадает с чёрным экраном) ----------
+function playJumpscare() {
   if (!ctx) return null;
   if (ctx.state === 'suspended') ctx.resume();
   const t0 = ctx.currentTime;
@@ -45,7 +167,7 @@ export function play(soundId) {
   out.gain.value = 0.9;
   const comp = ctx.createDynamicsCompressor();
   out.connect(comp);
-  comp.connect(ctx.destination);
+  comp.connect(master);
 
   // жёсткое искажение
   const shaper = ctx.createWaveShaper();
