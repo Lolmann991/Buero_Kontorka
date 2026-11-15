@@ -1,0 +1,156 @@
+[
+  {
+    "id": "step",
+    "file": "assets/audio/step.mp3",
+    "kind": "world",
+    "loop": false,
+    "volume": 0.93
+  },
+  {
+    "id": "door_open",
+    "file": "assets/audio/door_open.mp3",
+    "kind": "world",
+    "loop": false,
+    "volume": 0.48
+  },
+  {
+    "id": "door_slam",
+    "file": "assets/audio/door_slam.mp3",
+    "kind": "world",
+    "loop": false,
+    "volume": 0.58
+  },
+  {
+    "id": "glass_knock",
+    "file": "assets/audio/glass_knock.mp3",
+    "kind": "world",
+    "loop": false,
+    "volume": 0.32
+  },
+  {
+    "id": "toilet_water",
+    "file": "assets/audio/toilet_water.mp3",
+    "kind": "world",
+    "loop": true,
+    "volume": 0.61
+  },
+  {
+    "id": "keyboard",
+    "file": "assets/audio/keyboard.mp3",
+    "kind": "world",
+    "loop": true,
+    "volume": 0.56
+  },
+  {
+    "id": "ui_click",
+    "file": "assets/audio/ui_click.mp3",
+    "kind": "ui",
+    "loop": false,
+    "volume": 2.1
+  },
+  {
+    "id": "cam_switch",
+    "file": "assets/audio/cam_switch.mp3",
+    "kind": "ui",
+    "loop": false,
+    "volume": 1.25
+  },
+  {
+    "id": "cam_static",
+    "file": "assets/audio/cam_static.mp3",
+    "kind": "ui",
+    "loop": true,
+    "volume": 0.63
+  },
+  {
+    "id": "teams_ping",
+    "file": "assets/audio/teams_ping.mp3",
+    "kind": "ui",
+    "loop": false,
+    "volume": 0.74
+  },
+  {
+    "id": "teams_pressure",
+    "file": "assets/audio/teams_pressure.mp3",
+    "kind": "ui",
+    "loop": false,
+    "volume": 2.3
+  },
+  {
+    "id": "repair_hold",
+    "file": "assets/audio/repair_hold.mp3",
+    "kind": "ui",
+    "loop": true,
+    "volume": 0.47
+  },
+  {
+    "id": "repair_done",
+    "file": "assets/audio/repair_done.mp3",
+    "kind": "ui",
+    "loop": false,
+    "volume": 1.85
+  },
+  {
+    "id": "agent_lure",
+    "file": "assets/audio/agent_lure.mp3",
+    "kind": "ui",
+    "loop": false,
+    "volume": 0.42
+  },
+  {
+    "id": "overload_alarm",
+    "file": "assets/audio/overload_alarm.mp3",
+    "kind": "ui",
+    "loop": true,
+    "volume": 3.7
+  },
+  {
+    "id": "jumpscare",
+    "file": "assets/audio/jumpscare.mp3",
+    "kind": "ui",
+    "loop": false,
+    "volume": 0.6
+  },
+  {
+    "id": "glitch_ai",
+    "file": "assets/audio/glitch_ai.mp3",
+    "kind": "ui",
+    "loop": false,
+    "volume": 0.28
+  },
+  {
+    "id": "amb_pc_hum",
+    "file": "assets/audio/amb_pc_hum.mp3",
+    "kind": "ambient",
+    "loop": true,
+    "volume": 1.0
+  },
+  {
+    "id": "amb_night",
+    "file": "assets/audio/amb_night.mp3",
+    "kind": "ambient",
+    "loop": true,
+    "volume": 0.16
+  },
+  {
+    "id": "amb_cam_feed",
+    "file": "assets/audio/amb_cam_feed.mp3",
+    "kind": "ambient",
+    "loop": true,
+    "volume": 0.99
+  },
+  {
+    "id": "amb_tension",
+    "file": "assets/audio/amb_tension.mp3",
+    "kind": "ambient",
+    "loop": true,
+    "volume": 0.13
+  },
+  {
+    "id": "amb_dark",
+    "file": "assets/audio/amb_dark.mp3",
+    "kind": "ambient",
+    "loop": true,
+    "volume": 0.16
+  }
+]

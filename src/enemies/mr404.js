@@ -3,7 +3,7 @@
 // Читает из state: sla, load, appetite, time, tickets. Реакции на звонок получает через onEvent('call:start').
 //
 // ID звуков, которые этот враг просит у audio.play() (появятся на этапе 8; пока audio.play нет, вызовы пропускаются):
-// mr404.step, mr404.whistle, mr404.laugh, mr404.warning, door.knock, door.open, toilet.flush
+// step, whistle_mr404, laugh_mr404, warning_attack, glass_knock, door_open, door_slam, toilet_water (имена каталога, раздел 12)
 //
 // Допущение до этапа 7: тикет в state.tickets считается открытым, если у него нет done: true;
 // возраст в секундах берётся из tk.age или считается как state.time - tk.openedAt.
@@ -37,7 +37,8 @@ export function create(cfg, ctx) {
   const R = (a, b) => a + rng() * (b - a);
   const range = (pair) => R(pair[0], pair[1]);
   const rint = (a, b) => a + Math.floor(rng() * (b - a + 1));
-  const play = (sound, at) => audio.play?.(sound, at ? { at } : {});
+  const play = (sound, at, opts) => audio.play?.(sound, { ...(at ? { at } : {}), ...(opts || {}) });
+  let waterHandle = null;     // петля toilet_water, пока он в туалете
 
   const enemy = { id, pos: null, status: 'idle', update, onEvent, forceMove };
 
@@ -72,7 +73,7 @@ export function create(cfg, ctx) {
     trail.push(to);
     if (trail.length > 32) trail.shift();
     moveTo(to);
-    play('mr404.step', to);
+    play('step', to);
   }
 
   function trimTrailTo(pos) {
@@ -131,19 +132,20 @@ export function create(cfg, ctx) {
     timer = range(C.attack.warningToJumpscareSec);
     moveTo('desk');            // за спиной игрока; для камер он пропадает (статус warning)
     setStatus('warning');
-    play('mr404.warning', 'desk');
+    play('warning_attack', 'desk');
   }
 
   function enterToilet() {
     mode = 'toilet';
     timer = range(C.toiletStaySec);
     setStatus('hidden');
-    play('door.open', 's_toilet');
+    play('door_open', 's_toilet');
+    waterHandle = play('toilet_water', 's_toilet', { loop: true });
   }
 
   function leaveToilet() {
-    play('toilet.flush', 's_toilet');
-    play('door.open', 's_toilet');
+    if (waterHandle) { audio.stop?.(waterHandle); waterHandle = null; }
+    play('door_slam', 's_toilet');
     walkTo('s_floor');
     returning = true;
     dashLeft = 2;              // s_floor → s_hall3 → s_hall2
@@ -158,7 +160,7 @@ export function create(cfg, ctx) {
     trail = ['n_stairs'];
     moveTo('n_stairs');
     setStatus('break');
-    play('door.open', 'n_stairs');
+    play('door_open', 'n_stairs');
   }
 
   function leaveBreak() {
@@ -270,7 +272,7 @@ export function create(cfg, ctx) {
 
     // Смех: один раз, когда рейтинг падает ниже порога; снова после подъёма выше 50.
     if (mode !== 'absent') {
-      if (laughArmed && state.sla < C.slaBad) { play('mr404.laugh', enemy.pos); laughArmed = false; }
+      if (laughArmed && state.sla < C.slaBad) { play('laugh_mr404', enemy.pos); laughArmed = false; }
       else if (!laughArmed && state.sla > LAUGH_REARM_SLA) laughArmed = true;
     }
 
@@ -279,12 +281,12 @@ export function create(cfg, ctx) {
         appearT += dt;
         if (!knocked && appearT >= C.startDelaySec - KNOCK_BEFORE_SEC) {
           knocked = true;
-          play('door.knock', 'front');
+          play('glass_knock', 'front');
         }
         if (appearT >= C.startDelaySec) {
           trail = ['n_stairs'];
           moveTo('n_stairs');
-          play('mr404.step', 'n_stairs');
+          play('step', 'n_stairs');
           startPause(0);
         }
         break;
@@ -293,7 +295,7 @@ export function create(cfg, ctx) {
         whistleAcc += dt;
         if (whistleAcc >= 10) {
           whistleAcc -= 10;
-          if (rng() < C.whistleChancePer10s) play('mr404.whistle', enemy.pos);
+          if (rng() < C.whistleChancePer10s) play('whistle_mr404', enemy.pos);
         }
         if (timer <= 0) startDash();
         break;
