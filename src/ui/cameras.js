@@ -32,7 +32,8 @@ const VISIBLE = new Set(['idle', 'dash']);   // в других статусах
 const warned = new Set();
 const LIGHT_K = 1.15;       // насколько враг ярче фона вокруг него (1 = ровно как фон)
 let grids = {};            // сетка яркости 32x24 исходного кадра каждой камеры
-let spriteInfo = {};       // картинка позы -> { ready, luma, aspect }
+let spriteInfo = {};       // картинка позы -> { ready, luma, aspect, img }
+let spriteClean = {};      // `${src}|${edge}` -> dataURL картинки со срезанной каймой (или null)
 
 function el(tag, className, parent) {
   const e = document.createElement(tag);
@@ -317,6 +318,7 @@ function spriteStats(src) {
     const r = spriteInfo[src];
     if (!r) return;
     r.aspect = im.naturalWidth / im.naturalHeight;
+    r.img = im;
     try {
       const w = 32;
       const h = Math.max(1, Math.round(w / r.aspect));
@@ -343,6 +345,69 @@ function spriteStats(src) {
   };
   im.src = src;
   return null;
+}
+
+// Убираем светлую кайму вокруг вырезанной фигуры: срезаем край альфы на edge px
+// и затемняем две полоски у нового края. edge = 0 отключает обработку.
+function minFilter(src, w, h, r) {
+  if (r <= 0) return src;
+  const tmp = new Uint8Array(w * h);
+  const out = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let m = 255;
+      const b = Math.min(w - 1, x + r);
+      for (let i = Math.max(0, x - r); i <= b; i++) { const v = src[y * w + i]; if (v < m) m = v; }
+      tmp[y * w + x] = m;
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    const b = Math.min(h - 1, y + r);
+    for (let x = 0; x < w; x++) {
+      let m = 255;
+      for (let j = Math.max(0, y - r); j <= b; j++) { const v = tmp[j * w + x]; if (v < m) m = v; }
+      out[y * w + x] = m;
+    }
+  }
+  return out;
+}
+
+function cleanSprite(src, im, edge) {
+  if (!im || edge <= 0) return null;
+  const key = `${src}|${edge}`;
+  if (key in spriteClean) return spriteClean[key];
+  let url = null;
+  try {
+    const k = Math.min(1, 1024 / im.naturalHeight);
+    const w = Math.max(1, Math.round(im.naturalWidth * k));
+    const h = Math.max(1, Math.round(im.naturalHeight * k));
+    const cv = document.createElement('canvas');
+    cv.width = w;
+    cv.height = h;
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(im, 0, 0, w, h);
+    const data = cx.getImageData(0, 0, w, h);
+    const d = data.data;
+    const a0 = new Uint8Array(w * h);
+    for (let i = 0; i < a0.length; i++) a0[i] = d[i * 4 + 3];
+    const r = Math.round(edge);
+    const ae = minFilter(a0, w, h, r);
+    const n1 = minFilter(a0, w, h, r + 1);
+    const n2 = minFilter(a0, w, h, r + 3);
+    for (let i = 0; i < ae.length; i++) {
+      const o = i * 4;
+      d[o + 3] = ae[i];
+      if (!ae[i]) continue;
+      const dark = n1[i] < 255 ? 0.35 : (n2[i] < 255 ? 0.7 : 1);
+      if (dark < 1) { d[o] *= dark; d[o + 1] *= dark; d[o + 2] *= dark; }
+    }
+    cx.putImageData(data, 0, 0);
+    url = cv.toDataURL('image/png');
+  } catch (e) {
+    console.warn('cameras: не удалось срезать кайму спрайта', e);
+  }
+  spriteClean[key] = url;
+  return url;
 }
 
 // Средняя яркость исходного кадра там, где стоит фигура (область тела).
@@ -390,7 +455,9 @@ function renderSprites() {
     const hPct = def.h * s.scale;
     const wPct = hPct * 0.75 * st.aspect;        // кадр 4:3: высота в % высоты -> ширина в % ширины
     const local = localLuma(shown, s.x, s.y, hPct, wPct);
-    const b = Math.min(1, Math.max(0.25, (local * LIGHT_K * (s.light ?? 1)) / st.luma));
+    // автояркость под освещение кадра (0,25…1), поверх неё ручной множитель light (можно ярче 1)
+    const auto = Math.min(1, Math.max(0.25, (local * LIGHT_K) / st.luma));
+    const b = Math.min(3, Math.max(0.05, auto * (s.light ?? 1)));
     // тень под ногами: фигура стоит на полу, а не висит над кадром
     const sh = el('div', 'cam-spr__shadow', wrap);
     sh.style.left = `${s.x}%`;
@@ -399,7 +466,7 @@ function renderSprites() {
     const im = el('img', '', wrap);
     im.alt = '';
     im.draggable = false;
-    im.src = def.img;
+    im.src = cleanSprite(def.img, st.img, s.edge ?? 1) || def.img;
     im.style.left = `${s.x}%`;
     im.style.top = `${s.y}%`;
     im.style.height = `${hPct}%`;
@@ -497,8 +564,8 @@ export function mount(rootEl, ctx) {
     on('night:start', refresh),
     on('debug:highlight', highlight),
     on('debug:flash', () => { if (shown !== null) flash(); }),
-    on('debug:sprite', ({ pos, cam, x, y, scale, pose, light }) => {
-      sprOver[`${pos}:${cam}`] = { x, y, scale, pose, light };
+    on('debug:sprite', ({ pos, cam, x, y, scale, pose, light, edge }) => {
+      sprOver[`${pos}:${cam}`] = { x, y, scale, pose, light, edge };
       renderSprites();
     }),
     on('debug:tune', ({ cam, brightness, contrast }) => {
@@ -533,6 +600,7 @@ export function unmount() {
   tunes = {};
   grids = {};
   spriteInfo = {};
+  spriteClean = {};
   sprOver = {};
   sprSig = '';
 }

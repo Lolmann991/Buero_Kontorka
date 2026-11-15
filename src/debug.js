@@ -255,9 +255,9 @@ function buildEnemies(el) {
     if (!current) return;
     current.pose = poseSel.value;
     tuned[key()] = { pos: posSel.value, ...current };
-    emit('debug:sprite', { pos: posSel.value, cam: current.cam, x: current.x, y: current.y, scale: current.scale, pose: current.pose, light: current.light });
+    emit('debug:sprite', { pos: posSel.value, cam: current.cam, x: current.x, y: current.y, scale: current.scale, pose: current.pose, light: current.light, edge: current.edge });
     dump.textContent = Object.values(tuned).map((e) =>
-      `${e.pos}: { "cam": ${e.cam}, "slot": ${e.slot}, "x": ${e.x}, "y": ${e.y}, "scale": ${e.scale}, "pose": "${e.pose}"${e.light !== 1 ? `, "light": ${e.light}` : ''} }`).join('\n');
+      `${e.pos}: { "cam": ${e.cam}, "slot": ${e.slot}, "x": ${e.x}, "y": ${e.y}, "scale": ${e.scale}, "pose": "${e.pose}"${e.light !== 1 ? `, "light": ${e.light}` : ''}${e.edge !== 1 ? `, "edge": ${e.edge}` : ''} }`).join('\n');
   }
 
   function loadEntry() {
@@ -268,7 +268,8 @@ function buildEnemies(el) {
     current = { ...entry, ...(tuned[key()] || {}) };
     delete current.pos;
     current.light = current.light ?? 1;
-    for (const f of ['x', 'y', 'scale', 'light']) {
+    current.edge = current.edge ?? 1;
+    for (const f of ['x', 'y', 'scale', 'light', 'edge']) {
       fields[f].input.value = current[f];
       fields[f].out.textContent = String(current[f]);
     }
@@ -304,10 +305,11 @@ function buildEnemies(el) {
     h('div', { class: 'dbg-row' }, h('label', {}, t('debug.pos')), posSel),
     h('div', { class: 'dbg-row' }, h('label', {}, t('debug.cam')), camSel),
     h('div', { class: 'dbg-row' }, h('label', {}, t('debug.enemy.pose')), poseSel),
-    row('debug.enemy.x', 'x', 0, 100, 0.5),
-    row('debug.enemy.y', 'y', 0, 100, 0.5),
+    row('debug.enemy.x', 'x', -60, 160, 0.5),
+    row('debug.enemy.y', 'y', -60, 160, 0.5),
     row('debug.enemy.scale', 'scale', 0.1, 2.5, 0.02),
-    row('debug.enemy.light', 'light', 0.2, 2, 0.05),
+    row('debug.enemy.light', 'light', 0.2, 3, 0.05),
+    row('debug.enemy.edge', 'edge', 0, 4, 1),
     dump,
   );
 }

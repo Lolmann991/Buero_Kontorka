@@ -93,8 +93,9 @@
   "shutdown.fail": "Недостаточно токенов для запуска",
   "debug.section.enemies": "Враги (спрайты)",
   "debug.enemy.pose": "Поза",
-  "debug.enemy.x": "X, %",
-  "debug.enemy.y": "Y, % (ноги)",
+  "debug.enemy.x": "X, % (можно за кадр)",
+  "debug.enemy.y": "Y, % (ноги, можно за кадр)",
   "debug.enemy.scale": "Масштаб",
-  "debug.enemy.light": "Свет (яркость)"
+  "debug.enemy.light": "Яркость спрайта (×)",
+  "debug.enemy.edge": "Срез каймы, px (0 = выкл.)"
 }
