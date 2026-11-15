@@ -187,7 +187,7 @@ function buildCameras(el) {
   const current = () => tunes[cam()] ?? { brightness: 1, contrast: 1 };
   const tuneRow = (labelKey, field) => {
     const out = h('output', {}, '1');
-    const input = h('input', { type: 'range', min: 0.5, max: 2.5, step: 0.05, value: 1 });
+    const input = h('input', { type: 'range', min: 0.2, max: 2.5, step: 0.05, value: 1 });
     input.addEventListener('input', () => {
       const cur = { ...current(), [field]: Number(input.value) };
       tunes[cam()] = cur;
@@ -219,6 +219,11 @@ function buildCameras(el) {
     tuneRow('debug.cam.contrast', 'contrast'),
     dump,
   );
+}
+
+function buildGlitches(el) {
+  el.append(h('div', { class: 'dbg-btns' },
+    button('debug.glitch.clock333', () => emit('glitch', { type: 'clock333', source: 'fifth' }))));
 }
 
 // ---------- публичный API ----------
@@ -266,6 +271,7 @@ addSection('shift', 'debug.section.shift', buildShift);
 addSection('resources', 'debug.section.resources', buildResources);
 addSection('graph', 'debug.section.graph', buildGraph);
 addSection('cameras', 'debug.section.cameras', buildCameras);
+addSection('glitches', 'debug.section.glitches', buildGlitches);
 
 export function initDebug() {
   if (new URLSearchParams(location.search).get('debug') === '1') {

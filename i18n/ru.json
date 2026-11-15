@@ -78,5 +78,7 @@
   "debug.cam.break": "Сломать",
   "debug.cam.fix": "Починить",
   "debug.cam.bright": "Яркость (доп.)",
-  "debug.cam.contrast": "Контраст"
+  "debug.cam.contrast": "Контраст",
+  "debug.section.glitches": "Глюки",
+  "debug.glitch.clock333": "Часы 3:33"
 }

@@ -1,6 +1,6 @@
 // Единственный игровой цикл. Другие модули время берут только из события tick.
 
-import { state, set, patch, emit, on, newNight } from './state.js';
+import { state, set, patch, emit, on, newNight, recalcLoad } from './state.js';
 import { loadLang, t } from './i18n.js';
 import * as audio from './audio.js';
 import * as desk from './ui/desk.js';
@@ -10,6 +10,7 @@ import { initDebug } from './debug.js';
 
 const MAX_DT = 0.1; // секунды
 const NIGHT_SEC = 360;
+const CLOCK_333_SEC = 3 * 60 + 33;   // ночь 5: ровно в 3:33 на часах Sony появляются минуты
 
 let last = null;
 let lastHour = 0;
@@ -38,8 +39,14 @@ document.addEventListener('visibilitychange', () => {
 on('tick', ({ dt }) => {
   if (!state.running) return;
 
-  const time = Math.min(NIGHT_SEC, state.time + dt);
+  const prev = state.time;
+  const time = Math.min(NIGHT_SEC, prev + dt);
   set('time', time);
+
+  // ВРЕМЕННО здесь, позже уйдёт в данные ночей и модуль глюков (этап 9)
+  if (state.night === 5 && prev < CLOCK_333_SEC && time >= CLOCK_333_SEC) {
+    emit('glitch', { type: 'clock333', source: 'fifth' });
+  }
 
   const hour = Math.floor(time / 60);
   if (hour !== lastHour) {
@@ -66,12 +73,14 @@ on('intent:startShift', () => {
 on('intent:openCamera', ({ id }) => {
   if (!state.running) return;
   set('camera', id);
+  recalcLoad();
   emit('camera:open', { id });
 });
 
 on('intent:closeCamera', () => {
   if (state.camera === null) return;
   set('camera', null);
+  recalcLoad();
   emit('camera:close');
 });
 
@@ -79,6 +88,7 @@ on('intent:closeCamera', () => {
 on('night:end', () => {
   if (state.camera === null) return;
   set('camera', null);
+  recalcLoad();
   emit('camera:close');
 });
 

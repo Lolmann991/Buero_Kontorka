@@ -165,4 +165,10 @@ export function resetSave() {
   } catch (e) {}
 }
 
-// recalcLoad() и tickTokens(dt) добавятся на этапе 5.
+// Нагрузка по правилам раздела 5: фон 1, открыта камера +1.
+// Звонок-приманка (+2) и починка (+1) добавятся на этапе 5.
+export function recalcLoad() {
+  set('load', 1 + (_state.camera !== null ? 1 : 0));
+}
+
+// tickTokens(dt) добавится на этапе 5.

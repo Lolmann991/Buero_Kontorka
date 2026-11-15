@@ -9,7 +9,11 @@
         "x": 64.7,
         "y": 99.0
       },
-      "img": "assets/img/cams/cam01.webp"
+      "img": "assets/img/cams/cam01.webp",
+      "tune": {
+        "brightness": 0.5,
+        "contrast": 1.05
+      }
     },
     "2": {
       "name": "cams.2.name",
@@ -18,7 +22,11 @@
         "x": 62.8,
         "y": 180.2
       },
-      "img": "assets/img/cams/cam02.webp"
+      "img": "assets/img/cams/cam02.webp",
+      "tune": {
+        "brightness": 0.5,
+        "contrast": 1.05
+      }
     },
     "3": {
       "name": "cams.3.name",
@@ -27,7 +35,11 @@
         "x": 134.7,
         "y": 150.8
       },
-      "img": "assets/img/cams/cam03.webp"
+      "img": "assets/img/cams/cam03.webp",
+      "tune": {
+        "brightness": 0.5,
+        "contrast": 0.95
+      }
     },
     "4": {
       "name": "cams.4.name",
@@ -36,7 +48,11 @@
         "x": 132.3,
         "y": 266.4
       },
-      "img": "assets/img/cams/cam04.webp"
+      "img": "assets/img/cams/cam04.webp",
+      "tune": {
+        "brightness": 0.5,
+        "contrast": 1
+      }
     },
     "5": {
       "name": "cams.5.name",
@@ -45,7 +61,11 @@
         "x": 214.2,
         "y": 153.4
       },
-      "img": "assets/img/cams/cam05.webp"
+      "img": "assets/img/cams/cam05.webp",
+      "tune": {
+        "brightness": 0.5,
+        "contrast": 0.95
+      }
     },
     "6": {
       "name": "cams.6.name",
@@ -54,7 +74,11 @@
         "x": 300.1,
         "y": 154.6
       },
-      "img": "assets/img/cams/cam06.webp"
+      "img": "assets/img/cams/cam06.webp",
+      "tune": {
+        "brightness": 0.5,
+        "contrast": 0.95
+      }
     },
     "7": {
       "name": "cams.7.name",
@@ -63,7 +87,11 @@
         "x": 384.1,
         "y": 148.6
       },
-      "img": "assets/img/cams/cam07.webp"
+      "img": "assets/img/cams/cam07.webp",
+      "tune": {
+        "brightness": 0.5,
+        "contrast": 1.1
+      }
     },
     "8": {
       "name": "cams.8.name",
@@ -72,7 +100,11 @@
         "x": 450.6,
         "y": 110.8
       },
-      "img": "assets/img/cams/cam08.webp"
+      "img": "assets/img/cams/cam08.webp",
+      "tune": {
+        "brightness": 0.5,
+        "contrast": 1.1
+      }
     },
     "9": {
       "name": "cams.9.name",
@@ -81,7 +113,11 @@
         "x": 450.6,
         "y": 231.4
       },
-      "img": "assets/img/cams/cam09.webp"
+      "img": "assets/img/cams/cam09.webp",
+      "tune": {
+        "brightness": 0.5,
+        "contrast": 1.25
+      }
     },
     "10": {
       "name": "cams.10.name",
@@ -90,7 +126,11 @@
         "x": 544.0,
         "y": 149.9
       },
-      "img": "assets/img/cams/cam10.webp"
+      "img": "assets/img/cams/cam10.webp",
+      "tune": {
+        "brightness": 0.5,
+        "contrast": 1.3
+      }
     },
     "11": {
       "name": "cams.11.name",
@@ -99,7 +139,11 @@
         "x": 547.6,
         "y": 69.5
       },
-      "img": "assets/img/cams/cam11.webp"
+      "img": "assets/img/cams/cam11.webp",
+      "tune": {
+        "brightness": 0.5,
+        "contrast": 1.1
+      }
     }
   },
   "positions": {

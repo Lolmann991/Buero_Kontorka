@@ -19,6 +19,7 @@
       user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
+    :root { --noise: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxODAnIGhlaWdodD0nMTgwJz48ZmlsdGVyIGlkPSduJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nMC44NScgbnVtT2N0YXZlcz0nMicgc3RpdGNoVGlsZXM9J3N0aXRjaCcvPjxmZUNvbG9yTWF0cml4IHR5cGU9J3NhdHVyYXRlJyB2YWx1ZXM9JzAnLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0nMTAwJScgaGVpZ2h0PScxMDAlJyBmaWx0ZXI9J3VybCgjbiknLz48L3N2Zz4="); }
     #app { position: fixed; inset: 0; overflow: hidden; }
 
     /* Размытая копия фото на весь экран: заполняет поля, если окно шире кадра */
@@ -56,6 +57,76 @@
       pointer-events: none;
     }
     .layer { position: absolute; box-sizing: border-box; }
+    .desk-photo { filter: saturate(0.8) contrast(1.1) brightness(0.92); }
+
+    /* ---------- атмосфера стола: слои поверх фото, координаты в % сцены ---------- */
+    .fx { position: absolute; pointer-events: none; }
+    .fx-grade { inset: 0; background: rgba(8, 34, 30, 0.34); mix-blend-mode: color; }
+    .fx-window {
+      left: 0; top: 0; width: 13%; height: 38%;
+      overflow: hidden;
+      background: linear-gradient(100deg, rgba(70, 120, 255, 0.30), transparent 85%);
+      mix-blend-mode: screen;
+      animation: fx-window 13s linear infinite;
+    }
+    .fx-window__pass {
+      position: absolute; top: 0; bottom: 0; left: 0; width: 45%;
+      background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.85), transparent);
+      animation: fx-pass 17s linear infinite;
+    }
+    @keyframes fx-window {
+      0%, 100% { opacity: 0.85; } 40% { opacity: 1; } 41% { opacity: 0.35; } 42% { opacity: 1; } 70% { opacity: 0.7; }
+    }
+    @keyframes fx-pass {
+      0%, 88% { transform: translateX(-130%); } 100% { transform: translateX(260%); }
+    }
+    .fx-spill {
+      --spill: 0.5;
+      left: 18%; top: 70%; width: 64%; height: 30%;
+      background: radial-gradient(ellipse at 50% 0%, rgba(120, 255, 170, 0.2), transparent 70%);
+      mix-blend-mode: screen;
+      animation: fx-spill 6s linear infinite;
+    }
+    .stage.is-cam .fx-spill { --spill: 1; }
+    @keyframes fx-spill {
+      0%, 100% { opacity: var(--spill); }
+      30% { opacity: calc(var(--spill) * 0.75); }
+      32% { opacity: var(--spill); }
+      66% { opacity: calc(var(--spill) * 0.85); }
+    }
+    .fx-vignette {
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 45%, transparent 36%, rgba(0, 0, 0, calc(0.5 + 0.4 * var(--tension, 0))) 100%);
+      animation: fx-breathe 9s ease-in-out infinite alternate;
+    }
+    @keyframes fx-breathe { from { opacity: 0.8; } to { opacity: 1; } }
+    .fx-led {                                   /* индикатор веб-камеры над мониторами */
+      left: 51.44%; top: 12.43%;
+      width: 0.5cqw; height: 0.5cqw; margin: -0.25cqw 0 0 -0.25cqw;
+      border-radius: 50%;
+      background: #ff2a2a;
+      box-shadow: 0 0 0.8cqw 0.25cqw rgba(255, 40, 40, 0.65);
+      animation: fx-led 3.4s ease-in-out infinite;
+    }
+    @keyframes fx-led { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+    .fx-dim { inset: 0; background: #000; opacity: 0; animation: fx-dim 23s linear infinite; }
+    @keyframes fx-dim {
+      0%, 96% { opacity: 0; } 96.3% { opacity: 0.55; } 96.8% { opacity: 0.1; } 97.3% { opacity: 0.7; } 98% { opacity: 0; }
+    }
+    .fx-grain {
+      inset: -10%;
+      background-image: var(--noise);
+      opacity: 0.06;
+      mix-blend-mode: screen;
+      animation: fx-grain 0.9s steps(6) infinite;
+    }
+    @keyframes fx-grain {
+      0% { transform: translate(0, 0); } 20% { transform: translate(-3%, 2%); } 40% { transform: translate(2%, -3%); }
+      60% { transform: translate(-2%, -1%); } 80% { transform: translate(3%, 3%); } 100% { transform: translate(0, 0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .fx, .fx-window__pass { animation: none; }
+    }
 
     /* Часы Sony: SVG в координатах фото (1672x941), цифры рисуются сегментами */
     .clock-svg {
@@ -89,7 +160,7 @@
       position: absolute;
       inset: 0;
       z-index: 5;
-      background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxODAnIGhlaWdodD0nMTgwJz48ZmlsdGVyIGlkPSduJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nMC44NScgbnVtT2N0YXZlcz0nMicgc3RpdGNoVGlsZXM9J3N0aXRjaCcvPjxmZUNvbG9yTWF0cml4IHR5cGU9J3NhdHVyYXRlJyB2YWx1ZXM9JzAnLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0nMTAwJScgaGVpZ2h0PScxMDAlJyBmaWx0ZXI9J3VybCgjbiknLz48L3N2Zz4=");
+      background-image: var(--noise);
       opacity: 0.12;
       mix-blend-mode: screen;
       pointer-events: none;

@@ -23,6 +23,7 @@ const CLOCK = {
 // Холст 640x376 растягивается на него матрицей matrix3d (перспективное преобразование).
 // Углы (в px фото 1672x941): левый верх, правый верх, правый низ, левый низ.
 export const PHOTO_W = 1672;
+const CLOCK_GLITCH_SEC = 3;   // сколько секунд минуты на часах видны в глюке 3:33
 export const MONITOR_SIZE = [640, 376];
 export const MONITOR_QUADS = {
   left:  [[55.3, 138.6], [832.0, 149.4], [832.0, 593.3], [69.0, 601.6]],
@@ -119,14 +120,16 @@ function buildClock(parent) {
   for (const k of [0.30, 0.68]) {
     svgEl('rect', { class: 'seg', x: 0, y: -(h * k + t / 2), width: t, height: t }, cg);
   }
-  return cells;
+  return { cells, colon: cg };
 }
 
-// Время смены (секунды ночи) -> «12:00», « 1:00». Часы показывают только час: минуты всегда 00.
-export function formatClock(timeSec) {
+// Лицо часов Sony: только час («12», « 1»), минутные цифры и двоеточие погашены (AM горит на самом фото).
+// На время глюка (ночь 5, 3:33) загораются минуты: « 3:33».
+export function clockFace(timeSec, glitch = false) {
+  if (glitch) return { chars: [' ', '3', '3', '3'], colon: true };
   const hour = Math.min(6, Math.floor(timeSec / 60));
-  const h12 = hour === 0 ? 12 : hour;
-  return `${String(h12).padStart(2, ' ')}:00`;
+  const s = String(hour === 0 ? 12 : hour).padStart(2, ' ');
+  return { chars: [s[0], s[1], ' ', ' '], colon: false };
 }
 
 // ---------- модуль ----------
@@ -143,16 +146,41 @@ function el(tag, className, parent) {
 }
 
 function renderClock(state) {
-  const text = formatClock(state.time);
-  if (text === shownText) return;
-  shownText = text;
-  const chars = [text[0], text[1], text[3], text[4]];
-  chars.forEach((ch, i) => {
+  const face = clockFace(state.time, els.clockGlitch > 0);
+  const key = face.chars.join('') + (face.colon ? ':' : '');
+  if (key === shownText) return;
+  shownText = key;
+  face.chars.forEach((ch, i) => {
     const lit = DIGIT_SEGMENTS[ch] || '';
-    for (const key of 'abcdefg') {
-      els.cells[i][key].setAttribute('visibility', lit.includes(key) ? 'visible' : 'hidden');
+    for (const k of 'abcdefg') {
+      els.cells[i][k].setAttribute('visibility', lit.includes(k) ? 'visible' : 'hidden');
     }
   });
+  els.colon.setAttribute('visibility', face.colon ? 'visible' : 'hidden');
+}
+
+// Напряжение сцены 0..1: растёт к утру и при перегрузке сети. Только оформление (виньетка).
+function updateTension(state) {
+  const raw = state.running ? Math.min(1, (state.time / 360) * 0.7 + (state.load >= 5 ? 0.3 : 0)) : 0;
+  const v = Math.round(raw * 50) / 50;
+  if (v === els.tension) return;
+  els.tension = v;
+  els.stage.style.setProperty('--tension', String(v));
+}
+
+// Слои атмосферы. Всё в процентах сцены, поверх фото ничего не запекается.
+function buildFxBelow(stage) {
+  el('div', 'fx fx-grade', stage);
+  const win = el('div', 'fx fx-window', stage);          // свет с улицы сквозь жалюзи
+  el('div', 'fx-window__pass', win);                      // тень «проходит» за окном
+  el('div', 'fx fx-spill', stage);                        // свет мониторов на клавиатуре
+  el('div', 'fx fx-vignette', stage);
+}
+
+function buildFxAbove(stage) {
+  el('div', 'fx fx-led', stage);                          // индикатор веб-камеры сам горит красным
+  el('div', 'fx fx-dim', stage);                          // редкие провалы света
+  el('div', 'fx fx-grain', stage);
 }
 
 function showStart(titleKey, ctx) {
@@ -177,6 +205,8 @@ export function mount(rootEl, ctx) {
   img.alt = '';
   img.draggable = false;
 
+  buildFxBelow(els.stage);
+
   els.monLeft = el('div', 'mon', els.stage);
   els.monLeft.id = 'monitor-left';
   els.monRight = el('div', 'mon', els.stage);
@@ -189,7 +219,11 @@ export function mount(rootEl, ctx) {
     window.addEventListener('resize', layoutMonitors);
   }
 
-  els.cells = buildClock(els.stage);
+  const clock = buildClock(els.stage);
+  els.cells = clock.cells;
+  els.colon = clock.colon;
+  els.clockGlitch = 0;
+  buildFxAbove(els.stage);
   renderClock(state);
 
   // Стартовый экран
@@ -212,11 +246,25 @@ export function mount(rootEl, ctx) {
   els.rotate = el('div', 'rotate-hint', root);
   els.rotate.textContent = t('ui.rotateHint');
 
+  const syncCam = () => els.stage.classList.toggle('is-cam', state.camera !== null);
   offs = [
-    on('tick', () => renderClock(state)),
+    on('tick', ({ dt }) => {
+      if (els.clockGlitch > 0) els.clockGlitch = Math.max(0, els.clockGlitch - dt);
+      renderClock(state);
+      updateTension(state);
+    }),
+    on('glitch', ({ type }) => {
+      if (type !== 'clock333') return;
+      els.clockGlitch = CLOCK_GLITCH_SEC;
+      renderClock(state);
+    }),
+    on('camera:open', syncCam),
+    on('camera:close', syncCam),
     on('night:start', () => {
       shownText = '';
+      els.clockGlitch = 0;
       renderClock(state);
+      syncCam();
       els.start.hidden = true;
     }),
     // Временно: полноценный экран итога появится на этапе 10.
