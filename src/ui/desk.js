@@ -122,13 +122,11 @@ function buildClock(parent) {
   return cells;
 }
 
-// Время смены (секунды ночи) -> « 1:05», «12:00». 1 секунда игры = 1 минута на часах.
+// Время смены (секунды ночи) -> «12:00», « 1:00». Часы показывают только час: минуты всегда 00.
 export function formatClock(timeSec) {
-  const totalMin = Math.min(360, Math.floor(timeSec));
-  const hour = Math.floor(totalMin / 60);
-  const min = totalMin % 60;
+  const hour = Math.min(6, Math.floor(timeSec / 60));
   const h12 = hour === 0 ? 12 : hour;
-  return `${String(h12).padStart(2, ' ')}:${String(min).padStart(2, '0')}`;
+  return `${String(h12).padStart(2, ' ')}:00`;
 }
 
 // ---------- модуль ----------

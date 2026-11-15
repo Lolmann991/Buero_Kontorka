@@ -7,7 +7,11 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const HALLS = ['s_hall1', 's_hall2', 's_hall3'];   // сегменты одного зала: границы рисуем пунктиром
 const NOISE_W = 128;
 const NOISE_H = 96;
-const NOISE_MS = 90;   // единственное исключение из правила про таймеры: шум на canvas раз в 80–100 мс
+const NOISE_MS = 90;
+const LOAD_SEGMENTS = 5;     // максимум нагрузки по правилам: фон 1 + камера 1 + звонок 2 + починка 1
+const LOAD_OVERLOAD = 5;
+const AUTO_LUMA = 0.22;      // к какой средней яркости подтягиваются тёмные кадры (0..1)
+const AUTO_GAIN_MAX = 2.2;   // во сколько раз максимум можно осветлить кадр   // единственное исключение из правила про таймеры: шум на canvas раз в 80–100 мс
 
 let offs = [];
 let root = null;
@@ -18,6 +22,8 @@ let shown = null;      // номер камеры на экране или null 
 let noiseTimer = null;
 let preload = [];
 let last = {};         // последние тексты HUD, чтобы не трогать DOM зря
+let gains = {};        // автояркость по камерам (из средней яркости кадра)
+let tunes = {};        // ручная подстройка из отладочной панели
 
 function el(tag, className, parent) {
   const e = document.createElement(tag);
@@ -106,12 +112,13 @@ function buildView(parent, ctx) {
   const view = el('div', 'cam-view', parent);
 
   els.frame = el('div', 'cam-frame', view);
-  const feed = el('div', 'cam-feed', els.frame);           // фильтр действует на всё внутри
-  els.img = el('img', 'cam-img', feed);
+  const feed = (els.feed = el('div', 'cam-feed', els.frame));           // фильтр действует на всё внутри
+  const world = el('div', 'cam-world', feed);              // плавный дрейф «камеры»
+  els.img = el('img', 'cam-img', world);
   els.img.alt = '';
   els.img.draggable = false;
   els.img.addEventListener('error', () => console.warn(`cameras: не загрузился кадр камеры ${shown}`));
-  els.sprites = el('div', 'cam-sprites', feed);            // этап 6
+  els.sprites = el('div', 'cam-sprites', world);            // этап 6
 
   els.noise = el('canvas', 'cam-noise', els.frame);
   els.noise.width = NOISE_W;
@@ -123,6 +130,7 @@ function buildView(parent, ctx) {
     if (e.animationName === 'cam-flash') els.frame.classList.remove('is-flash');
   });
 
+  el('div', 'cam-roll', els.frame);
   el('div', 'cam-scan', els.frame);
 
   // Сломанная камера
@@ -146,7 +154,14 @@ function buildView(parent, ctx) {
   els.hudName = el('div', 'hud-name', hud);
   const stat = el('div', 'hud-stat', hud);
   els.hudTokens = el('div', '', stat);
-  els.hudLoad = el('div', '', stat);
+  const load = el('div', 'hud-load', stat);
+  els.hudLoadLabel = el('span', 'hud-load__label', load);
+  const bar = el('span', 'hud-load__bar', load);
+  els.loadSegs = [];
+  for (let i = 0; i < LOAD_SEGMENTS; i++) {
+    // 1–2 зелёные, 3–4 жёлтые, 5 красная
+    els.loadSegs.push(el('i', i < 2 ? 'lv-g' : i < 4 ? 'lv-y' : 'lv-r', bar));
+  }
 
   // Колонка справа: переключение камер и возврат на карту
   const side = el('div', 'cam-side', view);
@@ -216,14 +231,45 @@ function setText(key, node, text) {
 }
 
 function syncHud() {
-  const m = Math.min(360, Math.floor(S.time));
-  const hour = Math.floor(m / 60);
-  setText('time', els.hudTime,
-    T('cams.hud.time', { h: hour === 0 ? 12 : hour, m: String(m % 60).padStart(2, '0') }));
+  const hour = Math.min(6, Math.floor(S.time / 60));
+  setText('time', els.hudTime, T('cams.hud.time', { h: hour === 0 ? 12 : hour }));
   setText('tokens', els.hudTokens, T('cams.hud.tokens', { v: Math.ceil(S.tokens) }));
-  const over = S.load >= 5;
-  setText('load', els.hudLoad, over ? T('cams.hud.overload') : T('cams.hud.load', { v: S.load }));
-  els.hudLoad.classList.toggle('is-over', over);
+  const over = S.load >= LOAD_OVERLOAD;
+  setText('load', els.hudLoadLabel, over ? T('cams.hud.overload') : T('cams.hud.load'));
+  els.hudLoadLabel.classList.toggle('is-over', over);
+  const lit = Math.min(LOAD_SEGMENTS, Math.max(0, Math.round(S.load)));
+  if (last.lit !== lit) {
+    last.lit = lit;
+    els.loadSegs.forEach((seg, i) => seg.classList.toggle('is-lit', i < lit));
+  }
+}
+
+// Яркость кадра: автоподтяжка тёмных кадров и ручная подстройка (rooms.json → tune, отладка)
+function applyLook(cam) {
+  if (!els.feed) return;
+  const tune = { ...(cameraMeta(cam)?.tune || {}), ...(tunes[cam] || {}) };
+  const b = (gains[cam] ?? 1) * (tune.brightness ?? 1);
+  const c = tune.contrast ?? 1;
+  els.feed.style.setProperty('--cam-b', b.toFixed(3));
+  els.feed.style.setProperty('--cam-c', c.toFixed(3));
+}
+
+function measureGain(cam, im) {
+  try {
+    const cv = document.createElement('canvas');
+    cv.width = 32;
+    cv.height = 24;
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(im, 0, 0, 32, 24);
+    const d = cx.getImageData(0, 0, 32, 24).data;
+    let sum = 0;
+    for (let i = 0; i < d.length; i += 4) sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+    const mean = sum / (d.length / 4);
+    gains[cam] = Math.min(AUTO_GAIN_MAX, Math.max(1, AUTO_LUMA / Math.max(mean, 0.01)));
+  } catch (e) {
+    console.warn(`cameras: не удалось измерить яркость кадра ${cam}`, e);
+  }
+  if (shown === cam) applyLook(cam);
 }
 
 function showView(cam) {
@@ -239,6 +285,7 @@ function showView(cam) {
       els.img.removeAttribute('src');
       console.warn(`cameras: у камеры ${cam} нет img в rooms.json`);
     }
+    applyLook(cam);
     last = {};
     setText('name', els.hudName, T('cams.caption', { n: cam, name: T(meta.name) }));
     for (const [c, b] of Object.entries(els.sbtns)) b.classList.toggle('cam-sbtn--active', Number(c) === cam);
@@ -273,6 +320,7 @@ export function mount(rootEl, ctx) {
     const src = cameraMeta(cam)?.img;
     if (!src) return null;
     const im = new Image();
+    im.onload = () => measureGain(cam, im);
     im.src = src;
     return im;
   });
@@ -309,6 +357,10 @@ export function mount(rootEl, ctx) {
     on('night:start', refresh),
     on('debug:highlight', highlight),
     on('debug:flash', () => { if (shown !== null) flash(); }),
+    on('debug:tune', ({ cam, brightness, contrast }) => {
+      tunes[cam] = { brightness, contrast };
+      if (shown === cam) applyLook(cam);
+    }),
     // Поломка камеры и HUD читаются из state раз в кадр; своих игровых таймеров нет.
     on('tick', () => {
       if (shown === null) return;
@@ -332,4 +384,6 @@ export function unmount() {
   els = {};
   shown = null;
   last = {};
+  gains = {};
+  tunes = {};
 }

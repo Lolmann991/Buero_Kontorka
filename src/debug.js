@@ -180,6 +180,30 @@ function buildCameras(el) {
     select.append(h('option', { value: id }, t('cams.caption', { n: id, name: t(cameraMeta(id).name) })));
   }
   const cam = () => Number(select.value);
+
+  // Подстройка кадра выбранной камеры: смотри вид, крути, значения из текста ниже копируй в rooms.json
+  const tunes = {};
+  const dump = h('p', { class: 'dbg-info' }, '');
+  const current = () => tunes[cam()] ?? { brightness: 1, contrast: 1 };
+  const tuneRow = (labelKey, field) => {
+    const out = h('output', {}, '1');
+    const input = h('input', { type: 'range', min: 0.5, max: 2.5, step: 0.05, value: 1 });
+    input.addEventListener('input', () => {
+      const cur = { ...current(), [field]: Number(input.value) };
+      tunes[cam()] = cur;
+      out.textContent = input.value;
+      emit('debug:tune', { cam: cam(), ...cur });
+      dump.textContent = Object.entries(tunes)
+        .map(([c, v]) => `cam ${c}: "tune": { "brightness": ${v.brightness}, "contrast": ${v.contrast} }`)
+        .join('\n');
+    });
+    select.addEventListener('change', () => {
+      input.value = current()[field];
+      out.textContent = String(input.value);
+    });
+    return h('div', { class: 'dbg-row' }, h('label', {}, t(labelKey)), input, out);
+  };
+
   el.append(
     h('div', { class: 'dbg-row' }, h('label', {}, t('debug.cam')), select),
     h('div', { class: 'dbg-btns' },
@@ -191,6 +215,9 @@ function buildCameras(el) {
         if (!state.brokenCams.includes(cam())) set('brokenCams', [...state.brokenCams, cam()]);
       }),
       button('debug.cam.fix', () => set('brokenCams', state.brokenCams.filter((c) => c !== cam())))),
+    tuneRow('debug.cam.bright', 'brightness'),
+    tuneRow('debug.cam.contrast', 'contrast'),
+    dump,
   );
 }
 

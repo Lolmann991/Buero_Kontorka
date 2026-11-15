@@ -28,7 +28,8 @@ export function loadGraph(rooms) {
   }
   for (const [k, c] of Object.entries(rooms.cameras || {})) {
     cameras[Number(k)] = {
-      id: Number(k), name: c.name, pos: c.pos, img: c.img, btn: c.btn ? { ...c.btn } : null,
+      id: Number(k), name: c.name, pos: c.pos, img: c.img, tune: c.tune ? { ...c.tune } : {},
+      btn: c.btn ? { ...c.btn } : null,
     };
   }
 }
@@ -97,7 +98,7 @@ export function cameraIds() {
   return Object.keys(cameras).map(Number).sort((a, b) => a - b);
 }
 
-// { id, name (ключ словаря), pos, img (путь к кадру), btn: {x, y} } или undefined; btn это центр кнопки на карте
+// { id, name (ключ словаря), pos, img (путь к кадру), tune ({brightness, contrast}, необязательно), btn: {x, y} } или undefined; btn это центр кнопки на карте
 export function cameraMeta(cam) {
   return cameras[cam] ? { ...cameras[cam] } : undefined;
 }

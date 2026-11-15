@@ -62,9 +62,9 @@
   "cams.map.cam": "CAM",
   "cams.map.wc": "WC",
   "cams.hud.rec": "REC",
-  "cams.hud.time": "{h}:{m} AM",
+  "cams.hud.time": "{h} AM",
   "cams.hud.tokens": "ТОКЕНЫ {v}%",
-  "cams.hud.load": "НАГРУЗКА {v}",
+  "cams.hud.load": "НАГРУЗКА",
   "cams.hud.overload": "ПЕРЕГРУЗКА СЕТИ",
   "cams.back": "КАРТА",
   "cams.broken.error": "ОШИБКА: НЕТ СИГНАЛА",
@@ -76,5 +76,7 @@
   "debug.cam.close": "Закрыть",
   "debug.cam.flash": "Вспышка",
   "debug.cam.break": "Сломать",
-  "debug.cam.fix": "Починить"
+  "debug.cam.fix": "Починить",
+  "debug.cam.bright": "Яркость (доп.)",
+  "debug.cam.contrast": "Контраст"
 }
