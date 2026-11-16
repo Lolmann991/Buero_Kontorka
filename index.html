@@ -405,6 +405,11 @@
       font: 700 14px / 1 ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
       touch-action: manipulation;
     }
+    .cam-call-at {
+      position: absolute; left: 12px; bottom: 80px; z-index: 3; max-width: 220px;
+      font: 700 12px / 1.2 ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+      color: #cfcfcf; text-shadow: 0 0 3px #000, 0 0 6px #000; pointer-events: none;
+    }
     .cam-call::after { content: ""; position: absolute; inset: -4px; }
     .cam-call:active { background: #1f6f1f; border-color: #8dff8d; }
     .cam-call:disabled { color: #777; border-color: #555; }

@@ -2,7 +2,7 @@
 // Только рисует и шлёт намерения. Игровой логики здесь нет.
 
 import {
-  cameraIds, cameraMeta, mapOf, mapView, positionIds, isBlind, PLAYER_POS, camerasFor, spriteDef,
+  cameraIds, cameraMeta, mapOf, mapView, positionIds, isBlind, PLAYER_POS, camerasFor, spriteDef, labelOf,
 } from '../graph.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -179,6 +179,7 @@ function buildView(parent, ctx) {
   }
 
   // Панель ИИ-агента: звонок-приманка
+  els.callAt = el('div', 'cam-call-at', els.frame);   // куда звонит агент (комната открытой камеры)
   els.call = el('button', 'cam-call', els.frame);
   els.call.type = 'button';
   onPress(els.call, () => {
@@ -273,6 +274,8 @@ function syncCall() {
     : c.cooldown > 0 ? T('agent.cooldown', { s: Math.ceil(c.cooldown) })
     : T('agent.callButton');
   setText('call', els.call, text);
+  const room = (c.active ? c.at : cameraMeta(S.camera)?.pos) ?? null;
+  setText('callAt', els.callAt, room ? T(c.active ? 'agent.callingAt' : 'agent.callAt', { room: T(labelOf(room)) }) : '');
   const off = !S.running || S.tokens <= 0 || c.active || c.cooldown > 0;
   if (els.call.disabled !== off) els.call.disabled = off;
   els.call.classList.toggle('is-active', c.active);

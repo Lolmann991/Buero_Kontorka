@@ -60,10 +60,18 @@
         "lure": {
           "callSec": 8,
           "cooldownSec": 25,
-          "retreatGood": 2,
-          "retreatMid": 1,
-          "addPauseGoodSec": 12,
-          "addPauseMidSec": 6
+          "reactSec": [
+            1,
+            2
+          ],
+          "stepSec": [
+            2.2,
+            3.2
+          ],
+          "maxStepsGood": 6,
+          "maxStepsMid": 3,
+          "lingerGoodSec": 12,
+          "lingerMidSec": 6
         },
         "attack": {
           "dwellSec": 10,
@@ -74,7 +82,11 @@
         },
         "slaGood": 60,
         "slaBad": 40,
-        "whistleChancePer10s": 0.1
+        "whistleChancePer10s": 0.1,
+        "doorKnockSec": [
+          1.8,
+          2.6
+        ]
       }
     },
     "storyCalls": [

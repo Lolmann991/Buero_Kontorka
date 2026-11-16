@@ -118,6 +118,8 @@ function startHandle(handle, buf) {
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.loop = loop ?? def.loop;
+  // Шаги: высота меняется на ±5–8% при каждом воспроизведении, чтобы звук не повторялся (раздел 12).
+  if (handle._id === 'step') src.playbackRate.value = 1 + (Math.random() < 0.5 ? -1 : 1) * (0.05 + Math.random() * 0.03);
 
   let node = src;
   let gainVal = (volume ?? 1) * (def.volume ?? 1);

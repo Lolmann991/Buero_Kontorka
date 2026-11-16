@@ -16,9 +16,11 @@ const DEFAULTS = {
   hourFactor: [1.0, 0.85, 0.7], overloadFactor: 0.8, openTicketFactor: 0.9,
   appetiteFactorMax: 0.3,
   toiletStaySec: [15, 25], breakChance: 0.05, breakSec: [20, 30],
-  lure: { callSec: 8, cooldownSec: 25, retreatGood: 2, retreatMid: 1, addPauseGoodSec: 12, addPauseMidSec: 6 },
+  lure: { callSec: 8, cooldownSec: 25, reactSec: [1, 2], stepSec: [2.2, 3.2], maxStepsGood: 6, maxStepsMid: 3,
+    lingerGoodSec: 12, lingerMidSec: 6 },
   attack: { dwellSec: 10, warningToJumpscareSec: [3, 5] },
   slaGood: 60, slaBad: 40, whistleChancePer10s: 0.1,
+  doorKnockSec: [1.8, 2.6],   // пауза между стуком и входом с южного этажа в зал
 };
 
 const KNOCK_BEFORE_SEC = 6;          // стук в стеклянную дверь за 6 с до появления
@@ -42,7 +44,7 @@ export function create(cfg, ctx) {
 
   const enemy = { id, pos: null, status: 'idle', update, onEvent, forceMove };
 
-  // 'absent' (ещё не пришёл) | 'pause' | 'dash' | 'dwell' | 'toilet' | 'break' | 'warning' | 'dead'
+  // 'absent' (ещё не пришёл) | 'pause' | 'dash' | 'lured' (идёт на звонок) | 'dwell' | 'toilet' | 'break' | 'warning' | 'dead'
   let mode = 'absent';
   let frozen = false;       // отладка: остановить ИИ, пока подбираются спрайты
   let timer = 0;            // обратный отсчёт текущего режима
@@ -50,6 +52,7 @@ export function create(cfg, ctx) {
   let dashLeft = 0;
   let appearT = 0;
   let knocked = false;
+  let doorKnocked = false;  // уже постучал в дверь s_floor → s_hall3 и ждёт, чтобы войти
   let trail = [];           // пройденный путь, нужен приманке (отступить назад по маршруту)
   let returning = false;    // идёт из туалета обратно: s_floor → s_hall3 (транзитом) → s_hall2
   let goFloor = false;      // на s_hall3 выпало «идти в туалет», а не атаковать
@@ -69,7 +72,16 @@ export function create(cfg, ctx) {
     emit('enemy:moved', { id, from, to });
   }
 
+  // Дверь между южным этажом и залом стеклянная: входя в зал с этажа, он сначала стучит.
+  const needsKnock = (from, to) => from === 's_floor' && to === 's_hall3' && !doorKnocked;
+  function knockAtDoor() {
+    doorKnocked = true;
+    play('glass_knock', 's_floor');
+    return range(C.doorKnockSec);
+  }
+
   function walkTo(to) {
+    doorKnocked = false;
     trail.push(to);
     if (trail.length > 32) trail.shift();
     moveTo(to);
@@ -195,6 +207,7 @@ export function create(cfg, ctx) {
     if (pos === 's_hall3' && !returning && !goFloor) { enterDwell(); return; }
     const to = pickNext(pos);
     if (!to) { endDash(); return; }
+    if (needsKnock(pos, to)) { stepTimer = knockAtDoor(); return; }   // стук, потом вход на следующем шаге
     if (!graph.neighbors(pos).includes(to)) console.warn(`mr404: нет ребра ${pos} → ${to}`);
     if (pos === 's_hall3') goFloor = false;
     walkTo(to);
@@ -215,30 +228,87 @@ export function create(cfg, ctx) {
   }
 
   // ---------- приманка ----------
-  function onLure() {
+  // Звонок привязан к месту: звонит телефон в комнате открытой камеры (payload.at). Враг не телепортируется:
+  // он реагирует с задержкой, потом идёт к этому месту шагами по графу (быстрее всего слышно ближайших),
+  // а дойдя (или пройдя максимум шагов) осматривается, и только потом возвращается к обычному ритму.
+  const NO_GO = new Set(['desk', 'n_toilet', 's_toilet', 's_stairs']);   // сюда он по звонку не ходит
+  let lure = null;          // { path, stage: 'react' | 'walk' | 'linger', lingerSec }
+
+  // Кратчайший путь от текущей позиции к ближайшей доступной точке к месту звонка (без начальной позиции).
+  function routeTo(target) {
+    const start = enemy.pos;
+    if (!start) return null;
+    const prev = { [start]: null };
+    const queue = [start];
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const nb of graph.neighbors(cur)) {
+        if (NO_GO.has(nb) || nb in prev) continue;
+        prev[nb] = cur;
+        queue.push(nb);
+      }
+    }
+    let best = start;
+    let bestD = graph.distance(start, target);
+    for (const node of Object.keys(prev)) {
+      const d = graph.distance(node, target);
+      if (d < bestD) { best = node; bestD = d; }   // порядок обхода шире-в-ширину: при равенстве выигрывает ближний
+    }
+    const path = [];
+    for (let p = best; p && p !== start; p = prev[p]) path.unshift(p);
+    return path;
+  }
+
+  function onLure(payload) {
     if (mode === 'absent' || mode === 'toilet' || mode === 'break' || mode === 'warning' || mode === 'dead') return;
+    const at = payload?.at;
+    if (!at) return;
     const sla = state.sla;
     const good = sla >= C.slaGood;
     const mid = !good && sla >= C.slaBad;
     if (!good && !mid) { pauseMul = 0.9; return; }   // не отвлекает, но следующая пауза короче на 10%
 
-    const add = good ? C.lure.addPauseGoodSec : C.lure.addPauseMidSec;
-    if (mode === 'dwell') {
-      trimTrailTo('s_hall2');
-      moveTo('s_hall2');
-    } else {
-      const steps = good ? C.lure.retreatGood : C.lure.retreatMid;
-      for (let i = 0; i < steps && trail.length > 1; i++) trail.pop();
-      const to = trail[trail.length - 1];
-      if (to && to !== enemy.pos) moveTo(to);
-    }
+    const path = routeTo(at);
+    if (!path) return;
+    // Звонят в той самой комнате, где он уже стоит в окне атаки: звонок ничего не меняет (таймер не сбрасываем).
+    if (mode === 'dwell' && path.length === 0) return;
+
     returning = false;
     goFloor = false;
-    startPause(add);
+    lure = {
+      path: path.slice(0, good ? C.lure.maxStepsGood : C.lure.maxStepsMid),
+      stage: 'react',
+      lingerSec: good ? C.lure.lingerGoodSec : C.lure.lingerMidSec,
+    };
+    mode = 'lured';
+    timer = range(C.lure.reactSec);
+    setStatus('idle');
+  }
+
+  function updateLured(dt) {
+    timer -= dt;
+    if (timer > 0) return;
+    if (lure.stage === 'linger') { lure = null; startPause(0); return; }
+    if (lure.path.length === 0) { arriveLure(); return; }
+    if (lure.stage === 'react') { lure.stage = 'walk'; setStatus('dash'); }
+    if (needsKnock(enemy.pos, lure.path[0])) { timer = knockAtDoor(); return; }
+    walkTo(lure.path.shift());
+    if (lure.path.length === 0) arriveLure();
+    else timer = range(C.lure.stepSec);
+  }
+
+  function arriveLure() {
+    // Пришёл в комнату за твоей спиной по звонку: окно атаки начинается как обычно.
+    if (enemy.pos === 's_hall3') { lure = null; enterDwell(); return; }
+    lure.stage = 'linger';
+    timer = lure.lingerSec;
+    setStatus('idle');
   }
 
   // ---------- публичное ----------
   function forceMove(posId) {
+    lure = null;
+    doorKnocked = false;
     returning = false;
     goFloor = false;
     if (enemy.pos === null) trail = [posId];
@@ -250,7 +320,7 @@ export function create(cfg, ctx) {
   }
 
   function onEvent(name, payload) {
-    if (name === 'call:start' && payload?.kind === 'lure') { onLure(); return; }
+    if (name === 'call:start' && payload?.kind === 'lure') { onLure(payload); return; }
     if (name !== 'debug:enemy') return;
     switch (payload?.action) {
       case 'freeze':
@@ -303,6 +373,7 @@ export function create(cfg, ctx) {
         stepTimer -= dt;
         if (stepTimer <= 0) stepNow();
         break;
+      case 'lured': updateLured(dt); break;
       case 'dwell':
         timer -= dt;
         if (timer <= 0) enterWarning();

@@ -19,7 +19,7 @@ function initial() {
     enemies: {},
     brokenCams: [],
     camera: null,       // номер открытой камеры или null
-    call: { active: false, left: 0, cooldown: 0 }, // звонок-приманка: идёт, осталось, перезарядка (сек)
+    call: { active: false, left: 0, cooldown: 0, at: null }, // звонок-приманка: идёт, осталось, перезарядка (сек), позиция графа, куда звонят
     repairing: false,   // удерживается кнопка починки
     flags: { demoDone: false, ending: null, unlocked: [] },
   };

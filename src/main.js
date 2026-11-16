@@ -123,20 +123,25 @@ function endCall() {
   set('call.active', false);
   set('call.left', 0);
   set('call.cooldown', lureCfg().cooldownSec ?? 25);
+  set('call.at', null);
   recalcLoad();
   emit('call:end', { id: 'lure', kind: 'lure' });
 }
 
 on('intent:call', () => {
   if (!state.running || state.tokens <= 0) return;
+  // Звонок привязан к месту: звонит телефон в комнате открытой камеры, враг идёт туда сам.
+  const at = state.camera !== null ? graph.cameraMeta(state.camera)?.pos : null;
+  if (!at) return;
   // В окне атаки (враг на s_hall3 и виден на камерах) перезарядка приманки не действует (раздел 18).
   const dwelling = Object.values(state.enemies).some((e) => e.dwell);
   if (state.call.active || (state.call.cooldown > 0 && !dwelling)) return;
   if (dwelling) set('call.cooldown', 0);
   set('call.active', true);
   set('call.left', lureCfg().callSec ?? 8);
+  set('call.at', at);
   recalcLoad();
-  emit('call:start', { id: 'lure', kind: 'lure' });
+  emit('call:start', { id: 'lure', kind: 'lure', at });
 });
 
 // Удержание кнопки починки даёт +1 к нагрузке. Прогресс тикета считает tickets.js.
@@ -251,7 +256,12 @@ on('ticket:progress', ({ progress }) => {
   if (progress > 0 && progress < 1) { if (!holdSnd) holdSnd = audio.play('repair_hold'); }
   else stopHoldSound();
 });
-on('call:start', ({ kind }) => { if (kind === 'lure') { audio.stop(lureSnd); lureSnd = audio.play('agent_lure'); } });
+// Звонок слышен там, где звонит телефон (at): громкость, фильтр и панорама по расстоянию до стола.
+on('call:start', ({ kind, at }) => {
+  if (kind !== 'lure') return;
+  audio.stop(lureSnd);
+  lureSnd = audio.play('agent_lure', at ? { at } : {});
+});
 on('call:end', ({ kind }) => { if (kind === 'lure' && lureSnd) { audio.stop(lureSnd); lureSnd = null; } });
 on('camera:open', () => audio.play('cam_switch'));
 on('ticket:new', () => audio.play('teams_ping'));

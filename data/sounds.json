@@ -11,21 +11,21 @@
     "file": "assets/audio/door_open.mp3",
     "kind": "world",
     "loop": false,
-    "volume": 0.48
+    "volume": 0.8
   },
   {
     "id": "door_slam",
     "file": "assets/audio/door_slam.mp3",
     "kind": "world",
     "loop": false,
-    "volume": 0.58
+    "volume": 0.9
   },
   {
     "id": "glass_knock",
     "file": "assets/audio/glass_knock.mp3",
     "kind": "world",
     "loop": false,
-    "volume": 0.32
+    "volume": 0.9
   },
   {
     "id": "toilet_water",
@@ -95,7 +95,7 @@
     "file": "assets/audio/agent_lure.mp3",
     "kind": "ui",
     "loop": false,
-    "volume": 0.42
+    "volume": 0.9
   },
   {
     "id": "overload_alarm",
