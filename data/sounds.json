@@ -4,7 +4,8 @@
     "file": "assets/audio/step.mp3",
     "kind": "world",
     "loop": false,
-    "volume": 0.93
+    "volume": 0.93,
+    "sprite": [[0.78, 1.4], [1.93, 2.3], [2.78, 3.2], [3.5, 3.92], [4.8, 5.13], [6.45, 6.85]]
   },
   {
     "id": "door_open",
@@ -39,7 +40,9 @@
     "file": "assets/audio/keyboard.mp3",
     "kind": "world",
     "loop": true,
-    "volume": 0.56
+    "volume": 0.56,
+    "loopStart": 0,
+    "loopEnd": 3.04
   },
   {
     "id": "ui_click",

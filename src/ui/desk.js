@@ -602,7 +602,33 @@ export function mount(rootEl, ctx) {
   els.startBtn = el('button', 'start-btn', els.start);
   els.startBtn.type = 'button';
   els.startBtn.textContent = t('ui.startShift');
-  els.startTitle.textContent = t('ui.title');
+  els.startTitle.textContent = t('ui.title');
+
+  // Полный экран: на Android Chrome кнопка убирает панели браузера; на iPhone Safari API нет,
+  // там показываем подсказку про запуск с главного экрана (manifest + мета-теги в index.html).
+  const docEl = document.documentElement;
+  const reqFs = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (!standalone) {
+    if (reqFs) {
+      els.fsBtn = el('button', 'start-btn start-btn--ghost', els.start);
+      els.fsBtn.type = 'button';
+      els.fsBtn.textContent = t('ui.fullscreen');
+      els.fsBtn.addEventListener('pointerup', async (e) => {
+        if (e.button > 0) return;
+        try {
+          await reqFs.call(docEl, { navigationUI: 'hide' });
+          await screen.orientation?.lock?.('landscape').catch(() => {});
+        } catch (err) { console.warn('fullscreen:', err); }
+      });
+      const syncFs = () => { els.fsBtn.hidden = !!(document.fullscreenElement || document.webkitFullscreenElement); };
+      document.addEventListener('fullscreenchange', syncFs);
+      document.addEventListener('webkitfullscreenchange', syncFs);
+    } else {
+      els.fsHint = el('p', 'start-hint start-hint--small', els.start);
+      els.fsHint.textContent = t('ui.addToHome');
+    }
+  }
 
   // pointerup от касания — это жест, после которого браузер разрешает звук.
   els.startBtn.addEventListener('pointerup', (e) => {

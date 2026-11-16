@@ -217,6 +217,14 @@ function syncOverload() {
 }
 
 // ---------- архив ----------
+// Дата записи архива (ISO, например 2025-03-11) в формате языка интерфейса.
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(document.documentElement.lang || 'ru', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function renderArchive() {
   if (!els.arch) return;
   els.arch.replaceChildren();
@@ -241,7 +249,7 @@ function renderArchive() {
       continue;
     }
     el('span', 'tm-name', head).textContent = T(a.author);
-    el('span', 'tm-time', head).textContent = a.time ?? '';
+    el('span', 'tm-time', head).textContent = [fmtDate(a.date), a.time].filter(Boolean).join(' ');
     el('div', 'tm-text', node).textContent = T(a.text);
   }
   if (locked > 0) {

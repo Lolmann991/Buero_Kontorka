@@ -192,7 +192,7 @@
         "n_floor"
       ],
       "blind": false,
-      "pan": -0.8,
+      "pan": 0.8,
       "cams": [
         {
           "cam": 1,
@@ -220,7 +220,7 @@
         "front"
       ],
       "blind": false,
-      "pan": -0.6,
+      "pan": 0.2,
       "cams": [
         {
           "cam": 1,
@@ -258,7 +258,7 @@
         "n_hall"
       ],
       "blind": false,
-      "pan": -0.5,
+      "pan": -0.1,
       "cams": [
         {
           "cam": 2,
@@ -347,7 +347,7 @@
         "s_hall1"
       ],
       "blind": false,
-      "pan": -0.4,
+      "pan": 0.0,
       "cams": [
         {
           "cam": 3,
@@ -407,7 +407,7 @@
         "desk"
       ],
       "blind": false,
-      "pan": -0.3,
+      "pan": 0.0,
       "cams": [
         {
           "cam": 7,
@@ -493,7 +493,7 @@
         "desk"
       ],
       "blind": false,
-      "pan": 0.3,
+      "pan": 0.5,
       "cams": [
         {
           "cam": 8,
@@ -530,7 +530,7 @@
         "s_hall3"
       ],
       "blind": false,
-      "pan": 0.6,
+      "pan": -0.6,
       "cams": [
         {
           "cam": 9,
@@ -544,7 +544,7 @@
         },
         {
           "cam": 7,
-          "slot": 0,
+          "slot": 3,
           "x": 88.5,
           "y": 79.5,
           "scale": 0.56,
@@ -566,7 +566,7 @@
         "s_floor"
       ],
       "blind": true,
-      "pan": 0.5,
+      "pan": -0.5,
       "cams": [],
       "map": {
         "x": 494.4,
@@ -583,7 +583,7 @@
         "s_toilet"
       ],
       "blind": false,
-      "pan": 0.2,
+      "pan": 0.0,
       "cams": [
         {
           "cam": 10,
@@ -609,7 +609,7 @@
         "s_floor"
       ],
       "blind": false,
-      "pan": 0.3,
+      "pan": 0.7,
       "cams": [
         {
           "cam": 11,

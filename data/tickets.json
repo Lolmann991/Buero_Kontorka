@@ -4,7 +4,12 @@
       "text": [
         "tickets.pc.1",
         "tickets.pc.2",
-        "tickets.pc.3"
+        "tickets.pc.3",
+        "tickets.pc.4",
+        "tickets.pc.5",
+        "tickets.pc.6",
+        "tickets.pc.7",
+        "tickets.pc.8"
       ],
       "button": "agent.update",
       "holdSec": 5,
@@ -50,7 +55,11 @@
     "printer": {
       "text": [
         "tickets.printer.1",
-        "tickets.printer.2"
+        "tickets.printer.2",
+        "tickets.printer.3",
+        "tickets.printer.4",
+        "tickets.printer.5",
+        "tickets.printer.6"
       ],
       "button": "agent.reboot",
       "holdSec": 4,
@@ -66,7 +75,11 @@
     "camera": {
       "text": [
         "tickets.camera.1",
-        "tickets.camera.2"
+        "tickets.camera.2",
+        "tickets.camera.3",
+        "tickets.camera.4",
+        "tickets.camera.5",
+        "tickets.camera.6"
       ],
       "button": "agent.reboot",
       "holdSec": 3,
@@ -80,13 +93,24 @@
     "teams.sender.3",
     "teams.sender.4",
     "teams.sender.5",
-    "teams.sender.6"
+    "teams.sender.6",
+    "teams.sender.7",
+    "teams.sender.8",
+    "teams.sender.9",
+    "teams.sender.10",
+    "teams.sender.11",
+    "teams.sender.12"
   ],
   "pressure": [
     "tickets.pressure.1",
     "tickets.pressure.2",
     "tickets.pressure.3",
     "tickets.pressure.4",
-    "tickets.pressure.5"
+    "tickets.pressure.5",
+    "tickets.pressure.6",
+    "tickets.pressure.7",
+    "tickets.pressure.8",
+    "tickets.pressure.9",
+    "tickets.pressure.10"
   ]
 }

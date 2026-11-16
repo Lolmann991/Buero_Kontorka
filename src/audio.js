@@ -31,7 +31,7 @@ export function init() {
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.connect(ctx.destination);
-  src.start(0);
+  src.start(0, offset, dur);
   decodeAll();
   return ctx;
 }
@@ -118,6 +118,18 @@ function startHandle(handle, buf) {
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.loop = loop ?? def.loop;
+  // Нарезка: sprite — список [начало, конец] в секундах, играет случайный отрезок (шаги); loopStart/loopEnd — границы петли (клавиатура).
+  let offset = 0;
+  let dur;
+  if (def.sprite?.length) {
+    const [a, b] = def.sprite[Math.floor(Math.random() * def.sprite.length)];
+    offset = a;
+    dur = b - a;
+    src.loop = false;
+  } else if (src.loop && def.loopEnd) {
+    src.loopStart = def.loopStart ?? 0;
+    src.loopEnd = def.loopEnd;
+  }
   // Шаги: высота меняется на ±5–8% при каждом воспроизведении, чтобы звук не повторялся (раздел 12).
   if (handle._id === 'step') src.playbackRate.value = 1 + (Math.random() < 0.5 ? -1 : 1) * (0.05 + Math.random() * 0.03);
 
