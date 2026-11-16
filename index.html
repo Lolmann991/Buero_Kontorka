@@ -539,7 +539,30 @@
     .tm-arch__msg .tm-text { min-width: 0; }
     .tm-arch__locked { flex: none; padding: 8px; text-align: center; color: #5c5c7a; font-size: 12px; border: 1px dashed #3a3a58;
       border-radius: 6px; }
-    @media (prefers-reduced-motion: reduce) { .tm-overload, .tm-dots i { animation: none; } }
+    .tm-calls { position: absolute; inset: 0; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+    .tm-contact { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; background: #25253a; }
+    .tm-callbtn, .tm-hang { flex: none; min-width: 96px; height: 40px; border: 0; border-radius: 6px; font: inherit; font-weight: 700; color: #fff; }
+    .tm-callbtn { background: #2f8f4e; }
+    .tm-callbtn:disabled { background: #3a3a58; color: #8a8aa8; }
+    .tm-hang { background: #c63a3a; }
+    .tm-callbar { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 10px; background: #14141f; border-top: 1px solid #3a3a58; }
+    .tm-callbar__top { display: flex; align-items: center; gap: 9px; }
+    .tm-callbar .tm-avatar { background: #2f8f4e; }
+    .tm-callbar .tm-avatar.is-blank { position: relative; overflow: hidden; background: #6b6b78; }
+    .tm-callbar .tm-avatar.is-blank::before { content: ''; position: absolute; left: 9px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #2a2a34; }
+    .tm-callbar .tm-avatar.is-blank::after { content: ''; position: absolute; left: 4px; top: 16px; width: 20px; height: 14px; border-radius: 10px 10px 0 0; background: #2a2a34; }
+    .tm-callbar .tm-callbtn, .tm-callbar .tm-hang { min-width: 84px; height: 40px; }
+    .tm-callbar.is-ring .tm-avatar { animation: tm-ring 0.7s infinite alternate; }
+    .tm-callbar__sub { margin-top: 5px; font-size: 13px; line-height: 1.3; color: #f2f2fa; display: -webkit-box; -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical; overflow: hidden; }
+    .tm-main.has-call .tm-feed { bottom: 56px; }
+    .tm-main.has-call.is-story .tm-feed { bottom: 108px; }
+    .tm-main.has-call .tm-typing { bottom: 56px; }
+    .tm-main.has-call.is-story .tm-typing { bottom: 108px; }
+    .tm-main.has-call .tm-calls, .tm-main.has-call .tm-arch { bottom: 56px; }
+    .tm-main.has-call.is-story .tm-calls, .tm-main.has-call.is-story .tm-arch { bottom: 108px; }
+    @keyframes tm-ring { from { transform: scale(1); } to { transform: scale(1.18); } }
+    @media (prefers-reduced-motion: reduce) { .tm-overload, .tm-dots i, .tm-callbar .tm-avatar { animation: none; } }
 
     /* кнопка починки на камере (внутри .cam-world, едет вместе с кадром) */
     .cam-fix { position: absolute; transform: translate(-50%, -50%); min-width: 74px; height: 30px; padding: 0 10px;

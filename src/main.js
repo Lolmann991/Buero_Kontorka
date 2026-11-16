@@ -7,6 +7,7 @@ import * as desk from './ui/desk.js';
 import * as cameras from './ui/cameras.js';
 import * as teams from './ui/teams.js';
 import * as tickets from './tickets.js';
+import * as calls from './calls.js';
 import * as graph from './graph.js';
 import * as mr404 from './enemies/mr404.js';
 import { initDebug } from './debug.js';
@@ -231,9 +232,9 @@ on('jumpscare', ({ enemyId }) => {
 on('night:end', () => { enemies = []; });
 
 // Прослушанная запись ночи открывает привязанные к ней записи архива (flags.unlocked: 'call:<id>').
-// call:end для kind 'story' должен приходить и при выключении записи кнопкой (intent:muteCall).
-on('call:end', ({ id, kind }) => {
-  if (kind !== 'story') return;
+// Открывает только запись, прослушанная до конца: call:end story с outcome 'finished' (решено разработчиком).
+on('call:end', ({ id, kind, outcome }) => {
+  if (kind !== 'story' || outcome !== 'finished') return;
   patch('flags.unlocked', (list) => (list.includes(`call:${id}`) ? list : [...list, `call:${id}`]));
 });
 
@@ -340,6 +341,11 @@ async function boot() {
     tickets.load(await loadJSON('data/tickets.json'));
   } catch (e) {
     console.warn('tickets.json не загружен, тикеты отключены', e);
+  }
+  try {
+    calls.load(await loadJSON('data/calls.json'));
+  } catch (e) {
+    console.warn('calls.json не загружен, звонков не будет', e);
   }
   try {
     teams.setArchive(await loadJSON('data/teams-archive.json'));

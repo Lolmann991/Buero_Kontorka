@@ -31,7 +31,7 @@ export function init() {
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.connect(ctx.destination);
-  src.start(0, offset, dur);
+  src.start(0);
   decodeAll();
   return ctx;
 }
@@ -189,6 +189,10 @@ export function setAmbient(list) {
 // Работают как обычные звуки каталога (позиция, фильтр, панорама). Чтобы заменить на свой файл,
 // добавь запись с тем же id в data/sounds.json: каталог важнее заглушки.
 const SYNTH = {
+  teams_call: { volume: 0.5, make: makeRingtone },      // входящий звонок Teams (заглушка; свой teams_call.mp3 в sounds.json важнее)
+  call_ringback: { volume: 0.55, make: makeRingback },  // гудки исходящего звонка
+  call_pickup: { volume: 0.7, make: makePickup },       // «трубку взяли»
+  call_hangup: { volume: 0.6, make: makeHangup },       // «трубку положили»
   whistle_mr404: { volume: 0.5, make: makeWhistle },
   laugh_mr404: { volume: 0.8, make: makeLaugh },
   warning_attack: { volume: 0.9, make: makeWarning },
@@ -272,10 +276,80 @@ function makeWarning(sr) {
   return out;
 }
 
-// Звонки (запись + субтитры): появятся вместе с calls.json.
+// Телефонные звуки (заглушки; свой файл с тем же id в sounds.json важнее).
+function tone(out, sr, from, dur, freqs, amp = 1) {
+  const a = Math.floor(from * sr);
+  const n = Math.floor(dur * sr);
+  for (let i = 0; i < n && a + i < out.length; i++) {
+    const t = i / sr;
+    const env = Math.min(1, t / 0.01) * Math.min(1, (dur - t) / 0.01);
+    let v = 0;
+    for (const f of freqs) v += Math.sin(2 * Math.PI * f * t);
+    out[a + i] += v / freqs.length * env * amp;
+  }
+}
+// Рингтон Teams: две трели по четыре двойных тона, потом пауза.
+function makeRingtone(sr) {
+  const out = new Float32Array(Math.floor(sr * 2.4));
+  for (let r = 0; r < 2; r++) {
+    for (let k = 0; k < 4; k++) tone(out, sr, r * 0.9 + k * 0.1, 0.07, [880, 1320]);
+  }
+  return out;
+}
+// Гудки: 425 Гц, 1 с звук и 3 с тишины (петля).
+function makeRingback(sr) {
+  const out = new Float32Array(Math.floor(sr * 4));
+  tone(out, sr, 0, 1.0, [425]);
+  return out;
+}
+function makePickup(sr) {
+  const out = new Float32Array(Math.floor(sr * 0.25));
+  for (let i = 0; i < out.length; i++) out[i] = (Math.random() * 2 - 1) * Math.exp(-i / sr * 60);
+  tone(out, sr, 0.02, 0.05, [300]);
+  return out;
+}
+function makeHangup(sr) {
+  const out = new Float32Array(Math.floor(sr * 0.5));
+  tone(out, sr, 0, 0.12, [480, 620], 0.8);
+  tone(out, sr, 0.2, 0.12, [480, 620], 0.8);
+  return out;
+}
+
+// Записи звонков (data/calls.json): audio.loadCalls(список) при загрузке игры.
+const callDefs = {};
+export function loadCalls(map) {
+  Object.assign(callDefs, map);
+}
+// playCall(callId) -> handle { stop(), duration } | null. Субтитры шлёт calls.js (время только из tick).
+// Нет файла или он ещё грузится: звонок идёт без звука, handle.duration появится после загрузки.
 export function playCall(callId) {
-  console.warn(`audio.playCall: звонок «${callId}» пока не реализован`);
-  return null;
+  const def = callDefs[callId];
+  if (!def?.audio || !ctx) return null;
+  if (ctx.state === 'suspended') ctx.resume();
+  const handle = { duration: null, _stopped: false, _src: null, stop() { this._stopped = true; try { this._src?.stop(); } catch (e) { /* уже остановлен */ } } };
+  (async () => {
+    try {
+      if (!buffers[`call:${callId}`]) {
+        const res = await fetch(new URL(def.audio, document.baseURI));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        buffers[`call:${callId}`] = await ctx.decodeAudioData(await res.arrayBuffer());
+      }
+      const buf = buffers[`call:${callId}`];
+      handle.duration = buf.duration;
+      if (handle._stopped) return;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const g = ctx.createGain();
+      g.gain.value = def.volume ?? 1;
+      src.connect(g);
+      g.connect(master);
+      src.start(0);
+      handle._src = src;
+    } catch (e) {
+      console.warn(`audio.playCall: запись «${def.audio}» не загрузилась, звонок идёт без звука`, e);
+    }
+  })();
+  return handle;
 }
 
 // ---------- запасной синтез скримера (если jumpscare.mp3 не загрузился) ----------

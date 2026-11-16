@@ -25,6 +25,8 @@ let stickBottom = true;       // лента прижата к низу (новы
 let pending = [];             // сообщения-давление, которые ещё «печатаются»: { left, total, ticketId, key }
 let acc = 0;
 let tab = 'support';
+let E = null;                 // emit из ctx
+let phoneSig = '';            // что нарисовано в панели звонка
 
 function el(tag, className, parent) {
   const e = document.createElement(tag);
@@ -56,6 +58,7 @@ export function setArchive(list) {
 // ---------- построение ----------
 function build(ctx) {
   const { emit } = ctx;
+  E = emit;
   els.root = el('div', 'tm', root);
 
   const top = el('div', 'tm-top', els.root);
@@ -73,7 +76,7 @@ function build(ctx) {
   const body = el('div', 'tm-body', els.root);
   const side = el('div', 'tm-side', body);
   els.tabs = {};
-  for (const [id, key] of [['support', 'teams.channel.support'], ['archive', 'teams.channel.archive']]) {
+  for (const [id, key] of [['support', 'teams.channel.support'], ['calls', 'teams.channel.calls'], ['archive', 'teams.channel.archive']]) {
     const b = el('button', 'tm-tab', side);
     b.type = 'button';
     el('span', '', b).textContent = T(key);
@@ -84,6 +87,7 @@ function build(ctx) {
   els.dot.hidden = true;
 
   const main = el('div', 'tm-main', body);
+  els.main = main;
   els.feed = el('div', 'tm-feed', main);
   // Автопрокрутка вниз только пока игрок не отлистал ленту вверх.
   els.feed.addEventListener('scroll', () => {
@@ -99,7 +103,42 @@ function build(ctx) {
 
   els.arch = el('div', 'tm-arch', main);
   els.arch.hidden = true;
-  void emit;
+
+  // Вкладка «Звонки»: контакт, которому можно позвонить.
+  els.calls = el('div', 'tm-calls', main);
+  els.calls.hidden = true;
+  el('div', 'tm-arch__hint', els.calls).textContent = T('calls.hint');
+  const row = el('div', 'tm-contact', els.calls);
+  el('div', 'tm-avatar', row).textContent = initial(T('calls.contact.phoneGuy'));
+  const who = el('div', 'tm-card__body', row);
+  el('div', 'tm-name', who).textContent = T('calls.contact.phoneGuy');
+  el('div', 'tm-time', who).textContent = T('calls.contact.role');
+  els.dialBtn = el('button', 'tm-callbtn', row);
+  els.dialBtn.type = 'button';
+  els.dialBtn.textContent = T('calls.button.call');
+  onPress(els.dialBtn, () => { if (!els.dialBtn.disabled) emit('intent:dial', { contact: 'phoneGuy' }); });
+
+  // Панель звонка внизу Teams: видна на любой вкладке, пока идёт звонок (тикеты остаются видны выше).
+  els.bar = el('div', 'tm-callbar', main);
+  els.bar.hidden = true;
+  const barTop = el('div', 'tm-callbar__top', els.bar);
+  els.barAvatar = el('div', 'tm-avatar', barTop);
+  const info = el('div', 'tm-card__body', barTop);
+  els.barName = el('div', 'tm-name', info);
+  els.barStatus = el('div', 'tm-time', info);
+  els.declineBtn = el('button', 'tm-hang', barTop);
+  els.declineBtn.type = 'button';
+  els.declineBtn.textContent = T('calls.button.decline');
+  onPress(els.declineBtn, () => emit('intent:declineCall', { id: S.phone.id }));
+  els.answerBtn = el('button', 'tm-callbtn', barTop);
+  els.answerBtn.type = 'button';
+  els.answerBtn.textContent = T('calls.button.answer');
+  onPress(els.answerBtn, () => emit('intent:answerCall', { id: S.phone.id }));
+  els.hangBtn = el('button', 'tm-hang', barTop);
+  els.hangBtn.type = 'button';
+  els.hangBtn.textContent = T('calls.button.hangup');
+  onPress(els.hangBtn, () => emit('intent:hangUpCall'));
+  els.barSub = el('div', 'tm-callbar__sub', els.bar);
 }
 
 function setTab(id) {
@@ -107,6 +146,7 @@ function setTab(id) {
   for (const [k, b] of Object.entries(els.tabs)) b.classList.toggle('is-active', k === id);
   els.feed.hidden = id !== 'support';
   els.arch.hidden = id !== 'archive';
+  els.calls.hidden = id !== 'calls';
   if (id === 'support') els.dot.hidden = true;
   syncTyping();
   if (id === 'archive') renderArchive();
@@ -257,7 +297,39 @@ function renderArchive() {
   }
 }
 
+// ---------- звонки ----------
+const mmss = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+
+function syncPhone() {
+  if (!els.bar) return;
+  const p = S.phone;
+  const busy = p.status !== 'idle';
+  const sig = `${p.status}|${p.kind}|${Math.floor(p.t)}|${p.sub}|${S.tokens > 0}`;
+  if (sig === phoneSig) return;
+  phoneSig = sig;
+  els.bar.hidden = !busy;
+  els.main.classList.toggle('has-call', busy);
+  els.main.classList.toggle('is-story', p.status === 'playing');
+  els.dialBtn.disabled = busy || S.tokens <= 0 || !S.running;
+  els.dialBtn.textContent = T(busy ? 'calls.busy' : 'calls.button.call');
+  if (!busy) return;
+  els.barName.textContent = T(p.name);
+  const timed = p.status === 'playing' || p.status === 'open';
+  els.barStatus.textContent = T(`calls.status.${p.status === 'playing' ? 'talk' : p.status}`) + (timed ? ` · ${mmss(p.t)}` : '');
+  const incoming = p.status === 'incoming';
+  els.answerBtn.hidden = !incoming;
+  els.declineBtn.hidden = !incoming;
+  els.hangBtn.hidden = incoming || p.status === 'noanswer';
+  els.barAvatar.classList.toggle('is-blank', p.kind === 'story');
+  els.barAvatar.textContent = p.kind === 'story' ? '' : '☎';
+  els.barSub.hidden = p.status !== 'playing';
+  els.barSub.textContent = p.sub ? T(p.sub) : '';
+  els.bar.classList.toggle('is-ring', p.status === 'incoming' || p.status === 'ringing');
+}
+
 function reset() {
+  phoneSig = '';
+  syncPhone();
   items.clear();
   pending = [];
   els.feed.replaceChildren(els.empty);
@@ -298,7 +370,9 @@ export function mount(rootEl, ctx) {
     on('sla:change', syncSla),
     on('load:change', syncOverload),
     on('night:end', syncOverload),
+    on('night:end', () => { phoneSig = ''; syncPhone(); }),
     on('tick', ({ dt }) => {
+      syncPhone();
       updateTyping(dt);
       acc += dt;
       if (acc < REFRESH_SEC) return;
@@ -316,4 +390,5 @@ export function unmount() {
   els = {};
   items = new Map();
   pending = [];
+  phoneSig = '';
 }
