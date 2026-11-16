@@ -13,7 +13,7 @@ let loading = Promise.resolve();
 // Вызывать только из обработчика касания.
 export function init() {
   if (ctx) {
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state !== 'running') ctx.resume();
     return ctx;
   }
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -23,6 +23,7 @@ export function init() {
   }
   ctx = new AC();
   ctx.resume();
+  watchContext();
   master = ctx.createGain();
   master.gain.value = 1;
   master.connect(ctx.destination);
@@ -34,6 +35,22 @@ export function init() {
   src.start(0);
   decodeAll();
   return ctx;
+}
+
+// Полный экран, поворот экрана, сворачивание и звонки в телефоне могут остановить контекст
+// (suspended, а на iPhone ещё interrupted). Будим его при любом таком событии и при любом касании.
+function watchContext() {
+  const wake = () => {
+    if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+  };
+  ctx.addEventListener?.('statechange', () => {
+    console.info(`audio: состояние ${ctx.state}`);
+    wake();
+  });
+  for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(ev, wake);
+  for (const ev of ['orientationchange', 'pageshow', 'resize']) window.addEventListener(ev, wake);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
+  document.addEventListener('pointerdown', wake, true);
 }
 
 // Все id звуков (каталог + процедурные заглушки) для отладочной панели.
@@ -94,7 +111,7 @@ export function play(soundId, opts = {}) {
     return null;
   }
   if (!ctx) return null;
-  if (ctx.state === 'suspended') ctx.resume();
+  if (ctx.state !== 'running') ctx.resume();
 
   const handle = { stop() { stopHandle(handle); } };
   handle._id = soundId;
@@ -335,7 +352,7 @@ export function loadCalls(map) {
 export function playCall(callId) {
   const def = callDefs[callId];
   if (!def?.audio || !ctx) return null;
-  if (ctx.state === 'suspended') ctx.resume();
+  if (ctx.state !== 'running') ctx.resume();
   const handle = { duration: null, _stopped: false, _src: null, stop() { this._stopped = true; try { this._src?.stop(); } catch (e) { /* уже остановлен */ } } };
   (async () => {
     try {
@@ -365,7 +382,7 @@ export function playCall(callId) {
 // ---------- запасной синтез скримера (если jumpscare.mp3 не загрузился) ----------
 function playJumpscare() {
   if (!ctx) return null;
-  if (ctx.state === 'suspended') ctx.resume();
+  if (ctx.state !== 'running') ctx.resume();
   const t0 = ctx.currentTime;
   const DUR = 1.95;   // обрыв совпадает с чёрным экраном скримера
 
