@@ -265,6 +265,18 @@ on('call:start', ({ kind, at }) => {
 });
 on('call:end', ({ kind }) => { if (kind === 'lure' && lureSnd) { audio.stop(lureSnd); lureSnd = null; } });
 on('camera:open', () => audio.play('cam_switch'));
+const printerSnds = new Map();   // id тикета -> звук печати
+// Принтер печатает на позиции устройства: игрок слышит, с какой стороны тикет (текст тикета места не называет).
+on('ticket:new', ({ id }) => {
+  const tk = state.tickets.find((x) => x.id === id);
+  if (tk?.type !== 'printer') return;
+  const at = graph.cameraMeta(tk.cam)?.pos;
+  printerSnds.set(id, audio.play('printer_work', at ? { at } : {}));
+});
+// Звук печати длинный (около 36 с): когда тикет закрыт, принтер затихает.
+on('ticket:resolved', ({ id }) => { audio.stop(printerSnds.get(id)); printerSnds.delete(id); });
+// Конец смены без провала: куранты.
+on('night:end', ({ failed }) => { if (!failed) audio.play('night_end_chime'); });
 on('ticket:new', () => audio.play('teams_ping'));
 on('ticket:resolved', () => { stopHoldSound(); audio.play('repair_done'); });
 // Сообщение-давление: сначала слышна клавиатура на позиции устройства тикета, пока «печатает…», потом звук Teams.

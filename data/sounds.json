@@ -5,7 +5,32 @@
     "kind": "world",
     "loop": false,
     "volume": 0.93,
-    "sprite": [[0.78, 1.4], [1.93, 2.3], [2.78, 3.2], [3.5, 3.92], [4.8, 5.13], [6.45, 6.85]]
+    "sprite": [
+      [
+        0.78,
+        1.4
+      ],
+      [
+        1.93,
+        2.3
+      ],
+      [
+        2.78,
+        3.2
+      ],
+      [
+        3.5,
+        3.92
+      ],
+      [
+        4.8,
+        5.13
+      ],
+      [
+        6.45,
+        6.85
+      ]
+    ]
   },
   {
     "id": "door_open",
@@ -155,5 +180,76 @@
     "kind": "ambient",
     "loop": true,
     "volume": 0.16
+  },
+  {
+    "id": "teams_call",
+    "file": "assets/audio/teams_call.mp3",
+    "kind": "ui",
+    "loop": true,
+    "volume": 0.32
+  },
+  {
+    "id": "call_ringback",
+    "file": "assets/audio/call_ringback.mp3",
+    "kind": "ui",
+    "loop": true,
+    "volume": 0.37
+  },
+  {
+    "id": "call_pickup",
+    "file": "assets/audio/call_pickup.mp3",
+    "kind": "ui",
+    "loop": false,
+    "volume": 0.53
+  },
+  {
+    "id": "call_hangup",
+    "file": "assets/audio/call_hangup.mp3",
+    "kind": "ui",
+    "loop": false,
+    "volume": 0.28
+  },
+  {
+    "id": "whistle_mr404",
+    "file": "assets/audio/whistle_mr404.mp3",
+    "kind": "world",
+    "loop": false,
+    "volume": 0.52,
+    "sprite": [
+      [
+        0.12,
+        1.85
+      ],
+      [
+        1.85,
+        3.7
+      ],
+      [
+        3.7,
+        5.0
+      ]
+    ],
+    "fade": 0.08
+  },
+  {
+    "id": "laugh_mr404",
+    "file": "assets/audio/laugh_mr404.mp3",
+    "kind": "world",
+    "loop": false,
+    "volume": 1.8
+  },
+  {
+    "id": "printer_work",
+    "file": "assets/audio/printer_work.mp3",
+    "kind": "world",
+    "loop": false,
+    "volume": 1.25
+  },
+  {
+    "id": "night_end_chime",
+    "file": "assets/audio/night_end_chime.mp3",
+    "kind": "ui",
+    "loop": false,
+    "volume": 0.95
   }
 ]

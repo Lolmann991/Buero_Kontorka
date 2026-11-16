@@ -153,6 +153,16 @@ function startHandle(handle, buf) {
   }
   const g = ctx.createGain();
   g.gain.value = gainVal;
+  // Нарезка с плавным входом и выходом (def.fade, сек), чтобы обрезок не щёлкал.
+  if (def.sprite?.length && def.fade) {
+    const now = ctx.currentTime;
+    const len = dur / src.playbackRate.value;
+    const f = Math.min(def.fade, len / 2);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(gainVal, now + 0.02);
+    g.gain.setValueAtTime(gainVal, now + len - f);
+    g.gain.linearRampToValueAtTime(0, now + len);
+  }
   node.connect(g);
   g.connect(master);
   src.onended = () => { try { g.disconnect(); } catch (e) { /* уже отключён */ } };
