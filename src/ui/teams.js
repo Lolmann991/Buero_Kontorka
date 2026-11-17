@@ -13,6 +13,8 @@ export function typingSec(text) {
 }
 const REFRESH_SEC = 0.2;      // как часто обновляем возраст карточек
 const AGE_FULL_SEC = 120;     // полоса возраста заполняется к моменту пропуска тикета
+const PHANTOM_TYPING_SEC = 3.5; // фантомное «печатает…» (глюк пятого), если в событии не задано иное
+const PHANTOM_TOAST_SEC = 12;   // сколько висит фантомное уведомление
 
 let root = null;
 let els = {};
@@ -27,6 +29,9 @@ let acc = 0;
 let tab = 'support';
 let E = null;                 // emit из ctx
 let phoneSig = '';            // что нарисовано в панели звонка
+let phTyping = 0;             // сколько ещё секунд показывать фантомное «печатает…» (глюк пятого)
+let toast = null;             // фантомное уведомление: { node, left, dot }
+let dotReal = false;          // точка на вкладке «Поддержка» стоит из-за настоящего сообщения
 
 function el(tag, className, parent) {
   const e = document.createElement(tag);
@@ -147,9 +152,14 @@ function setTab(id) {
   els.feed.hidden = id !== 'support';
   els.arch.hidden = id !== 'archive';
   els.calls.hidden = id !== 'calls';
-  if (id === 'support') els.dot.hidden = true;
+  if (id === 'support') {
+    els.dot.hidden = true;
+    dotReal = false;
+    if (toast) hideToast(true);   // игрок открыл чат: фантом увиден
+  }
   syncTyping();
   if (id === 'archive') renderArchive();
+  if (E) E('intent:teamsTab', { tab: id });
 }
 
 // ---------- лента поддержки ----------
@@ -162,7 +172,36 @@ function trimFeed() {
 }
 
 function markUnread() {
-  if (tab !== 'support') els.dot.hidden = false;
+  if (tab !== 'support') {
+    els.dot.hidden = false;
+    dotReal = true;
+  }
+}
+
+// ---------- фантомное уведомление (глюк пятого) ----------
+// Выглядит как настоящее сообщение от «Ночного коллеги», но в ленте после него ничего нет.
+function showToast(ttl) {
+  hideToast();
+  const name = T('calls.contact.phoneGuy');
+  const node = el('div', 'tm-toast is-fifth', els.main);
+  el('div', 'tm-avatar', node).textContent = initial(name);
+  const body = el('div', 'tm-card__body', node);
+  el('div', 'tm-name', body).textContent = name;
+  el('div', 'tm-text', body).textContent = T('teams.phantom.preview');
+  onPress(node, () => setTab('support'));
+  const dot = tab !== 'support';
+  if (dot) els.dot.hidden = false;
+  toast = { node, left: ttl, dot };
+}
+
+// seen: true (игрок открыл чат) или false (истекло время) сообщает модулю глюков; без аргумента просто убирает.
+function hideToast(seen) {
+  if (!toast) return;
+  const cur = toast;
+  toast = null;
+  cur.node.remove();
+  if (cur.dot && !dotReal) els.dot.hidden = true;
+  if (seen !== undefined && E) E('intent:glitchSeen', { type: 'phantomNotify', seen });
 }
 
 function addCard(tk) {
@@ -226,11 +265,28 @@ function refreshCards() {
 // «печатает…» перед сообщением; длительность зависит от длины текста
 function syncTyping() {
   const cur = pending[0];
-  const show = !!cur && tab === 'support';
+  const ghost = !cur && phTyping > 0;   // фантом: индикатор есть, сообщения не будет
+  const show = (!!cur || ghost) && tab === 'support';
   els.typing.hidden = !show;
+  els.typing.classList.toggle('is-fifth', ghost);
   if (show) {
-    const tk = S.tickets.find((x) => x.id === cur.ticketId);
-    els.typingText.textContent = T('teams.typing', { name: tk ? T(tk.senderKey) : '' });
+    const tk = cur ? S.tickets.find((x) => x.id === cur.ticketId) : null;
+    const name = cur ? (tk ? T(tk.senderKey) : '') : T('calls.contact.phoneGuy');
+    els.typingText.textContent = T('teams.typing', { name });
+  }
+}
+
+function updatePhantom(dt) {
+  if (phTyping > 0) {
+    phTyping -= dt;
+    if (phTyping <= 0) {
+      phTyping = 0;
+      syncTyping();
+    }
+  }
+  if (toast) {
+    toast.left -= dt;
+    if (toast.left <= 0) hideToast(false);
   }
 }
 
@@ -332,6 +388,9 @@ function reset() {
   syncPhone();
   items.clear();
   pending = [];
+  phTyping = 0;
+  hideToast();
+  dotReal = false;
   els.feed.replaceChildren(els.empty);
   stickBottom = true;
   els.empty.hidden = false;
@@ -362,7 +421,17 @@ export function mount(rootEl, ctx) {
       const text = T(key);
       const total = typingSec(text);
       pending.push({ left: total, total, ticketId: id, key });
+      phTyping = 0;                 // настоящая печать важнее фантома
       syncTyping();
+    }),
+    on('glitch', ({ type, durationSec, ttlSec }) => {
+      if (type === 'phantomTyping') {
+        if (pending.length || tab !== 'support') return;
+        phTyping = durationSec ?? PHANTOM_TYPING_SEC;
+        syncTyping();
+      } else if (type === 'phantomNotify') {
+        showToast(ttlSec ?? PHANTOM_TOAST_SEC);
+      }
     }),
     on('ticket:resolved', refreshCards),
     on('ticket:missed', refreshCards),
@@ -373,6 +442,7 @@ export function mount(rootEl, ctx) {
     on('night:end', () => { phoneSig = ''; syncPhone(); }),
     on('tick', ({ dt }) => {
       syncPhone();
+      updatePhantom(dt);
       updateTyping(dt);
       acc += dt;
       if (acc < REFRESH_SEC) return;
@@ -391,4 +461,7 @@ export function unmount() {
   items = new Map();
   pending = [];
   phoneSig = '';
+  phTyping = 0;
+  toast = null;
+  dotReal = false;
 }

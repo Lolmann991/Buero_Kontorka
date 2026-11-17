@@ -350,8 +350,18 @@ function buildMr404(el) {
 }
 
 function buildGlitches(el) {
-  el.append(h('div', { class: 'dbg-btns' },
-    button('debug.glitch.clock333', () => emit('glitch', { type: 'clock333', source: 'fifth' }))));
+  // Фантомы Teams идут через glitches.js (звук и время показа берутся из nights.json).
+  const phantom = (action, variant) => emit('debug:glitch', { action, variant });
+  el.append(
+    h('div', { class: 'dbg-btns' },
+      button('debug.glitch.clock333', () => emit('glitch', { type: 'clock333', source: 'fifth' }))),
+    h('div', { class: 'dbg-btns' },
+      button('debug.glitch.phantomTyping', () => phantom('typing')),
+      button('debug.glitch.phantomNotify', () => phantom('notify'))),
+    h('div', { class: 'dbg-btns' },
+      button('debug.glitch.chainNotify', () => phantom('chain', 'notifyFirst')),
+      button('debug.glitch.chainTyping', () => phantom('chain', 'typingFirst'))),
+    h('p', { class: 'dbg-info' }, t('debug.glitch.hint')));
 }
 
 // ---------- звуки ----------

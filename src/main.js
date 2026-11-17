@@ -7,6 +7,7 @@ import * as desk from './ui/desk.js';
 import * as cameras from './ui/cameras.js';
 import * as teams from './ui/teams.js';
 import * as tickets from './tickets.js';
+import * as glitches from './glitches.js';
 import * as calls from './calls.js';
 import * as graph from './graph.js';
 import * as mr404 from './enemies/mr404.js';
@@ -246,6 +247,13 @@ on('tick', ({ dt }) => {
   if (!state.running) return;
   tickets.update(dt);
 });
+
+// ---------- глюки (этап 9) ----------
+// Фантомы Teams (глюки пятого): условия и порядок решает glitches.js, рисует teams.js.
+const glitchMod = glitches.create({ state, emit, on, rng: Math.random });
+on('night:start', () => glitchMod.start(nights[state.night] ?? {}));
+on('tick', () => { if (state.running) glitchMod.update(); });
+on('debug:glitch', (p) => glitchMod.debug(p, nights[state.night] ?? nights[1] ?? {}));
 
 // ---------- звуки интерфейса ----------
 let alarm = null;

@@ -89,6 +89,29 @@
         ]
       }
     },
+    "glitches": {
+      "phantom": {
+        "windowSec": [
+          150,
+          300
+        ],
+        "variant": "random",
+        "typingSec": 3.5,
+        "notifyTtlSec": 12,
+        "gapAfterSeenSec": [
+          4,
+          7
+        ],
+        "gapAfterTypingSec": [
+          8,
+          14
+        ],
+        "stepDeadlineSec": 40,
+        "quietAfterMessageSec": 8,
+        "notifySound": "teams_ping",
+        "notifyVolume": 0.5
+      }
+    },
     "storyCalls": [
       "call_n1"
     ],

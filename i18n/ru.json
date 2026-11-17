@@ -84,6 +84,11 @@
   "debug.cam.contrast": "Контраст",
   "debug.section.glitches": "Глюки",
   "debug.glitch.clock333": "Часы 3:33",
+  "debug.glitch.phantomTyping": "Фантом: печатает",
+  "debug.glitch.phantomNotify": "Фантом: уведомление",
+  "debug.glitch.chainNotify": "Связка: уведомление → печать",
+  "debug.glitch.chainTyping": "Связка: печать → уведомление",
+  "debug.glitch.hint": "Первые две кнопки показывают глюк сразу. Связка идёт с настоящими условиями (смена запущена, токены есть, нет звонка и тикетов рядом) и ждёт до 90 с. Для «уведомление → печать» сначала открой в Teams архив или звонки, потом открой чат и оставайся в нём.",
   "agent.callButton": "Позвонить",
   "agent.calling": "Звонок…",
   "agent.cooldown": "Ждите {s} с",
@@ -260,5 +265,6 @@
   "calls.hint": "Внутренняя связь. Звонок не тратит токены.",
   "calls.busy": "Идёт другой звонок",
   "calls.button.answer": "Принять",
-  "calls.button.decline": "Отклонить"
+  "calls.button.decline": "Отклонить",
+  "teams.phantom.preview": "Ты меня слышишь?.."
 }
