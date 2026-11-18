@@ -308,7 +308,8 @@ function buildOfficeHud(parent, t) {
   const segs = [];
   for (let i = 0; i < HUD_SEGMENTS; i++) segs.push(el('i', i < 2 ? 'lv-g' : i < 4 ? 'lv-y' : 'lv-r', bar));
   const doors = el('div', 'oh-doors', hud);
-  return { hud, num, fill, segs, doors, loadLabel, last: {} };
+  const info = el('div', 'oh-info', hud);
+  return { hud, num, fill, segs, doors, loadLabel, info, last: {} };
 }
 
 function syncOffice(state, t) {
@@ -362,6 +363,28 @@ function syncOffice(state, t) {
   const word = (s) => t(state.doors[s] ? 'cams.map.doorClosed' : 'cams.map.doorOpen');
   const dt = t('cams.map.doors', { l: word('left'), r: word('right') });
   if (h.last.doors !== dt) { h.last.doors = dt; h.doors.textContent = dt; }
+  const info = t('office.info', { n: state.night, c: state.coinsNight });
+  if (h.last.info !== info) { h.last.info = info; h.info.textContent = info; }
+  syncCoins(state);
+}
+
+// Монеты в кабинете: на столе (scene) и на полу у дверей (side). Монеты на камерах рисует ui/cameras.js.
+function syncCoins(state) {
+  const list = state.running ? state.coins.filter((c) => c.where !== 'cam') : [];
+  const sig = list.map((c) => `${c.id}:${c.where}`).join(',');
+  if (sig === els.coinSig) return;
+  els.coinSig = sig;
+  for (const layer of Object.values(els.coinLayers)) layer.replaceChildren();
+  for (const c of list) {
+    const layer = els.coinLayers[c.where];
+    if (!layer) continue;
+    const b = el('button', 'coin', layer);
+    b.type = 'button';
+    b.style.left = `${c.x}%`;
+    b.style.top = `${c.y}%`;
+    b.setAttribute('aria-label', els.coinLabel);
+    b.addEventListener('pointerup', (e) => { if (e.button <= 0) els.emit('intent:coin', { id: c.id }); });
+  }
 }
 
 // Кнопки взгляда: стрелки по краям, «Камеры» внизу, «Назад» в режиме камер.
@@ -826,15 +849,30 @@ function updateScare(dt, ctx) {
   sc.t += dt;
   if (sc.t >= SCARE_END) {
     resetScare();
-    showStart('ui.shiftFailed', ctx);
+    ctx.emit('ui:scareDone');      // дальше экран «Game Over» (ui/screens.js)
     return;
   }
   sc.root.dataset.phase = sc.t < SCARE_FLASH ? 'flash' : sc.t < SCARE_CUT_AT ? 'show' : 'black';
   drawScare(sc, dt);
 }
 
+// Меню: звёзды за пройденные ночи, монеты, заработок, кнопки «Ночь N» и «Новая игра».
+const MAX_STARS = 5;
+function renderMenu(ctx) {
+  const { state, t } = ctx;
+  const f = state.flags;
+  const stars = Math.min(MAX_STARS, f.stars || 0);
+  els.menuStars.textContent = '★'.repeat(stars) + '☆'.repeat(MAX_STARS - stars);
+  els.menuStars.setAttribute('aria-label', t('menu.starsLabel', { n: stars, max: MAX_STARS }));
+  els.menuStats.textContent = t('menu.stats', { coins: f.coins || 0, money: ((f.money || 0) / 100).toFixed(2).replace('.', ',') });
+  els.startBtn.textContent = t('menu.startNight', { n: state.night });
+  els.newGameBtn.hidden = state.night <= 1;
+  els.menuWeek.hidden = !f.weekDone;
+}
+
 function showStart(titleKey, ctx) {
   els.startTitle.textContent = ctx.t(titleKey);
+  renderMenu(ctx);
   els.start.hidden = false;
 }
 
@@ -900,6 +938,11 @@ export function mount(rootEl, ctx) {
   renderClock(state);
 
   els.hud = buildOfficeHud(els.stage, t);
+  els.coinLabel = t('coins.label');
+  els.emit = emit;
+  els.coinSig = '';
+  els.coinLayers = { desk: el('div', 'coin-layer', els.scene) };
+  for (const side of ['left', 'right']) els.coinLayers[side] = el('div', 'coin-layer', els.sides[side].wrap);
   buildNav(els.stage, ctx);
   bindSwipe(els.stage, ctx);
   els.keyHandler = (e) => onKey(e, ctx);
@@ -928,6 +971,18 @@ export function mount(rootEl, ctx) {
   els.startBtn.type = 'button';
   els.startBtn.textContent = t('ui.startShift');
   els.startTitle.textContent = t('ui.title');
+  els.menuStars = el('div', 'menu-stars', els.start);
+  els.menuStats = el('p', 'start-hint menu-stats', els.start);
+  els.menuWeek = el('p', 'start-hint menu-week', els.start);
+  els.menuWeek.textContent = t('menu.weekDone');
+  els.start.insertBefore(els.menuStars, els.startHint);
+  els.start.insertBefore(els.menuStats, els.startHint);
+  els.start.insertBefore(els.menuWeek, els.startHint);
+  els.newGameBtn = el('button', 'start-btn start-btn--ghost', els.start);
+  els.newGameBtn.type = 'button';
+  els.newGameBtn.textContent = t('menu.newGame');
+  els.newGameBtn.addEventListener('pointerup', (e) => { if (e.button <= 0) emit('intent:newGame'); });
+  renderMenu(ctx);
 
   // Полный экран: на Android Chrome кнопка убирает панели браузера; на iPhone Safari API нет,
   // там показываем подсказку про запуск с главного экрана (manifest + мета-теги в index.html).
@@ -997,9 +1052,9 @@ export function mount(rootEl, ctx) {
       syncCam();
       els.start.hidden = true;
     }),
-    // Временно: полноценный экран итога появится на этапе 10.
-    // После скримера (failed) стартовый экран покажет updateScare, когда кадр отыграет.
-    on('night:end', (p) => { if (!p?.failed) showStart('ui.shiftOver', ctx); }),
+    // Итог ночи рисует ui/screens.js («6 AM», чек, «Game Over»); оттуда возвращаемся в меню.
+    on('ui:menu', () => showStart('ui.title', ctx)),
+    on('progress:change', () => renderMenu(ctx)),
   ];
 }
 

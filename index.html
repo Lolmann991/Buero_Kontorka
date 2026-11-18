@@ -740,6 +740,98 @@
       background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.25) 0 1px, transparent 1px 3px); }
     .scare[data-phase="black"] .scare-tint, .scare[data-phase="flash"] .scare-tint { display: none; }
 
+    /* ---------- монеты ---------- */
+    .coin-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+    .coin {
+      position: absolute; width: max(20px, 2.1cqw); height: max(20px, 2.1cqw); margin: 0; padding: 0;
+      transform: translate(-50%, -50%) rotate(-8deg); border-radius: 50%; cursor: pointer; pointer-events: auto;
+      border: max(2px, 0.2cqw) solid #8a6a12;
+      background: radial-gradient(circle at 35% 30%, #fff6c0, #f2c230 35%, #b88a14 75%, #7a5a0a);
+      box-shadow: 0 0 0.8cqw 0.15cqw rgba(255, 210, 80, 0.45), inset 0 0 0.3cqw rgba(0, 0, 0, 0.5);
+      animation: coin-glint 2.6s ease-in-out infinite; touch-action: manipulation;
+    }
+    .coin::before { content: "K"; position: absolute; inset: 0; display: grid; place-items: center;
+      color: #7a5a0a; font: 800 max(11px, 1.1cqw) / 1 system-ui, sans-serif; }
+    .coin::after { content: ""; position: absolute; inset: -12px; }
+    .cam-coin { width: 26px; height: 26px; border-width: 2px; box-shadow: 0 0 10px 3px rgba(255, 255, 200, 0.7); z-index: 2; }
+    .cam-coin::before { font-size: 13px; }
+    @keyframes coin-glint { 0%, 80%, 100% { filter: brightness(1); } 88% { filter: brightness(1.8); } }
+    .oh-info { color: #e9d27a; font-size: max(9px, 0.9cqw); }
+
+    /* ---------- меню: звёзды и статистика ---------- */
+    .menu-stars { font-size: clamp(1.4rem, 4vw, 2.2rem); letter-spacing: 0.25em; color: #f2c230;
+      text-shadow: 0 0 10px rgba(242, 194, 48, 0.5); }
+    .menu-stats { margin: 0; color: #e9d27a; opacity: 0.9; }
+    .menu-week { margin: 0; color: #8dff8d; }
+    .menu-week[hidden] { display: none; }
+
+    /* ---------- конец ночи: 6 AM ---------- */
+    @font-face { font-family: "Digital7"; src: url("assets/fonts/digital-7.ttf") format("truetype"); font-display: swap; }
+    .end-six, .end-check, .end-over { position: absolute; inset: 0; z-index: 11; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1rem; background: #000; text-align: center; padding: 1rem; }
+    .end-six[hidden], .end-check[hidden], .end-over[hidden] { display: none; }
+    .end-six__clock { font-family: "Digital7", ui-monospace, monospace; font-size: clamp(4rem, 18vw, 11rem); line-height: 1;
+      color: #14d014; text-shadow: 0 0 18px rgba(20, 208, 20, 0.7); display: flex; align-items: baseline; gap: 0.15em; }
+    .end-six__h { display: inline-block; min-width: 0.6em; }
+    .end-six.is-rolled .end-six__h { animation: six-roll 0.5s ease-out 1; }
+    @keyframes six-roll { from { transform: translateY(-60%); opacity: 0; } to { transform: none; opacity: 1; } }
+    .end-six__am { font-size: 0.45em; }
+    .end-six__night { color: #d8e6d8; font-size: clamp(1rem, 3vw, 1.6rem); letter-spacing: 0.15em; opacity: 0; }
+    .end-six.is-rolled .end-six__night { animation: six-fade 1s 0.4s ease-out forwards; }
+    @keyframes six-fade { to { opacity: 1; } }
+
+    /* ---------- зарплатный чек ---------- */
+    .end-check { background: radial-gradient(ellipse at center, #1a1f1a, #000 75%); gap: 0.7rem; overflow-y: auto; }
+    .pc {
+      position: relative; box-sizing: border-box; width: min(92vw, 640px); padding: 14px 20px 12px;
+      background: linear-gradient(135deg, #f3ecd2, #e6dbb6); color: #2b2a24; text-align: left;
+      border: 1px solid #b9ab7d; border-radius: 4px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+      background-image: repeating-linear-gradient(45deg, rgba(120, 140, 90, 0.07) 0 2px, transparent 2px 8px),
+        linear-gradient(135deg, #f3ecd2, #e6dbb6);
+      font: 14px/1.35 Georgia, "Times New Roman", serif;
+      transform: rotate(-1.2deg) translateY(30px); opacity: 0;
+    }
+    .end-check.is-in .pc { animation: pc-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+    @keyframes pc-in { to { transform: rotate(-1.2deg); opacity: 1; } }
+    .pc-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #4a5a3a;
+      padding-bottom: 4px; margin-bottom: 8px; }
+    .pc-bank { font-weight: 700; letter-spacing: 0.12em; color: #2d4a2a; }
+    .pc-no { font: 12px ui-monospace, Menlo, monospace; color: #6a634a; }
+    .pc-row { display: flex; gap: 10px; align-items: baseline; margin: 3px 0; }
+    .pc-label { flex: none; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6a634a; }
+    .pc-val { flex: 1; border-bottom: 1px dotted #8a8266; font-family: "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive; font-weight: 400; }
+    .pc-amount { position: absolute; right: 20px; top: 46px; display: flex; align-items: baseline; gap: 6px;
+      padding: 4px 10px; border: 2px solid #4a5a3a; background: rgba(255, 255, 255, 0.4); font-size: 22px; }
+    .pc-cur { font-size: 16px; }
+    .pc-lines { margin: 6px 0 4px; font-size: 12px; color: #5a5440; }
+    .pc-memo { margin-top: 6px; padding: 6px 8px; background: rgba(0, 0, 0, 0.05); border-left: 3px solid #8a3a2a; }
+    .pc-memo__text { display: block; margin-top: 2px; font-family: "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive; font-size: 15px; color: #1d2a6a; }
+    .pc-foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px; }
+    .pc-micr { font: 13px ui-monospace, Menlo, monospace; letter-spacing: 0.1em; color: #3a3a3a; }
+    .pc-sign { font-family: "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive; font-size: 17px; color: #1d2a6a;
+      border-top: 1px solid #8a8266; padding: 2px 8px 0; }
+    .pc-stamp { position: absolute; right: 26%; top: 38%; padding: 4px 12px; border: 3px solid #b3261e; border-radius: 6px;
+      color: #b3261e; font: 800 20px/1 system-ui, sans-serif; letter-spacing: 0.15em; transform: rotate(-14deg) scale(2.2);
+      opacity: 0; mix-blend-mode: multiply; pointer-events: none; }
+    .end-check.is-stamped .pc-stamp { animation: pc-stamp 0.25s ease-in forwards; }
+    @keyframes pc-stamp { to { transform: rotate(-14deg) scale(1); opacity: 0.85; } }
+    .end-check__total { color: #e9d27a; font-size: 0.95rem; }
+    .end-check__next { color: #d8e6d8; opacity: 0.8; font-size: 0.9rem; }
+
+    /* ---------- Game Over ---------- */
+    .end-over { background: #000; overflow: hidden; }
+    .end-over__noise { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; opacity: 0.22; }
+    .end-over > :not(canvas) { position: relative; }
+    .end-over__title { margin: 0; color: #ff3030; font: 800 clamp(2.5rem, 10vw, 6rem) / 1 ui-monospace, Menlo, monospace;
+      letter-spacing: 0.1em; text-shadow: 3px 0 #00e5ff, -3px 0 #ff0030; animation: over-shake 0.4s steps(2) infinite; }
+    @keyframes over-shake { 0% { transform: translate(0, 0); } 50% { transform: translate(-2px, 1px) skewX(-3deg); } }
+    .end-over__sub { margin: 0; color: #d8e6d8; letter-spacing: 0.12em; }
+    .end-over__jab { margin: 0; max-width: 34rem; color: #ffb0b0; font-style: italic; }
+    .end-over__btns { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+    @media (prefers-reduced-motion: reduce) {
+      .coin, .end-over__title, .end-six.is-rolled .end-six__h { animation: none; }
+    }
+
     /* ---------- стартовый экран ---------- */
     .start-screen {
       position: absolute;

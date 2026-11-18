@@ -203,6 +203,18 @@ export function stop(handle) {
   handle?.stop?.();
 }
 
+// Подстройка уже играющего звука (петли): громкость относительно каталога и скорость.
+export function tune(handle, { volume, rate } = {}) {
+  if (!handle || !ctx) return;
+  const now = ctx.currentTime;
+  if (typeof volume === 'number' && handle._gain) {
+    const v = volume * (handle._def?.volume ?? 1);
+    handle._gain.gain.cancelScheduledValues(now);
+    handle._gain.gain.setTargetAtTime(v, now, 0.3);
+  }
+  if (typeof rate === 'number' && handle._src) handle._src.playbackRate.setTargetAtTime(rate, now, 0.3);
+}
+
 // Фон: список id (петли). Меняет набор: лишнее гасит, недостающее запускает.
 export function setAmbient(list) {
   const want = new Set(list);
@@ -229,6 +241,15 @@ const SYNTH = {
   whistle_mr404: { volume: 0.5, make: makeWhistle },
   laugh_mr404: { volume: 0.8, make: makeLaugh },
   warning_attack: { volume: 0.9, make: makeWarning },
+  // кабинет: приближение врага, двери, свет, монеты, итог ночи
+  heartbeat: { volume: 0.9, make: makeHeartbeat },      // петля: враг совсем рядом (зал у кабинета / у двери)
+  breath: { volume: 0.7, make: makeBreath },            // петля: дыхание за дверью
+  growl: { volume: 0.8, make: makeGrowl },              // низкий рык, когда он встаёт в проём
+  sting: { volume: 1.0, make: makeSting },              // резкий аккорд: включил свет, а он там
+  light_buzz: { volume: 0.25, make: makeBuzz },         // петля: гудение лампы в коридоре
+  shutter: { volume: 0.8, make: makeShutter },          // рольставня двери
+  coin: { volume: 0.7, make: makeCoin },                // монета подобрана
+  stamp: { volume: 0.9, make: makeStamp },              // штамп на чеке
 };
 
 function ensureSynth(id) {
@@ -305,6 +326,131 @@ function makeWarning(sr) {
     const rise = 0.35 * k * Math.sin(risePh);
     const env = Math.min(1, t / 0.2) * Math.min(1, (dur - t) / 0.1);
     out[i] = (drone * pulse + rise + 0.08 * k * (Math.random() * 2 - 1)) * env;
+  }
+  return out;
+}
+
+// ---------- кабинет ----------
+const noise = () => Math.random() * 2 - 1;
+
+// Сердцебиение «тук-тук», 0,9 с на удар (петля).
+function makeHeartbeat(sr) {
+  const n = Math.floor(sr * 0.9);
+  const out = new Float32Array(n);
+  for (const [at, amp] of [[0, 1], [0.24, 0.7]]) {
+    const a = Math.floor(at * sr);
+    for (let i = 0; i < sr * 0.22 && a + i < n; i++) {
+      const t = i / sr;
+      const f = 62 - 30 * t;
+      out[a + i] += amp * Math.sin(2 * Math.PI * f * t) * Math.min(1, t / 0.006) * Math.exp(-t * 18);
+    }
+  }
+  return out;
+}
+
+// Дыхание: вдох и выдох шумом через простой фильтр, 3,2 с (петля).
+function makeBreath(sr) {
+  const dur = 3.2;
+  const n = Math.floor(sr * dur);
+  const out = new Float32Array(n);
+  let lp = 0, lp2 = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const inhale = t < 1.2 ? Math.sin(Math.PI * t / 1.2) : 0;
+    const exhale = t > 1.5 && t < 3.0 ? Math.sin(Math.PI * (t - 1.5) / 1.5) : 0;
+    const k = t < 1.4 ? 0.08 : 0.04;              // вдох выше, выдох глуше
+    lp += k * (noise() - lp);
+    lp2 += 0.3 * (lp - lp2);
+    out[i] = (lp - lp2 * 0.5) * (0.6 * inhale ** 1.5 + exhale ** 1.2);
+  }
+  return out;
+}
+
+// Рык: низкий шум с дрожанием и подголоском 70 Гц.
+function makeGrowl(sr) {
+  const dur = 1.6;
+  const n = Math.floor(sr * dur);
+  const out = new Float32Array(n);
+  let lp = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    lp += 0.03 * (noise() - lp);
+    const trem = 0.6 + 0.4 * Math.sin(2 * Math.PI * 23 * t);
+    const env = Math.min(1, t / 0.15) * Math.min(1, (dur - t) / 0.4);
+    out[i] = (lp * 6 * trem + 0.5 * Math.sin(2 * Math.PI * (70 - 15 * t) * t) * trem) * env;
+  }
+  return out;
+}
+
+// Испуг: диссонансный аккорд с резкой атакой и шумом.
+function makeSting(sr) {
+  const dur = 1.4;
+  const n = Math.floor(sr * dur);
+  const out = new Float32Array(n);
+  const fr = [233, 247, 349, 370, 494, 523, 740];
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    let v = 0;
+    for (const f of fr) v += Math.sin(2 * Math.PI * f * t * (1 + 0.004 * Math.sin(40 * t)));
+    const env = Math.min(1, t / 0.005) * Math.exp(-t * 2.4);
+    out[i] = (v / fr.length + 0.4 * noise() * Math.exp(-t * 14)) * env;
+  }
+  return out;
+}
+
+// Гудение лампы: 100 Гц с обертонами и треском (петля 1 с).
+function makeBuzz(sr) {
+  const n = sr;
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    let v = 0;
+    for (let h = 1; h <= 8; h++) v += Math.sin(2 * Math.PI * 100 * h * t) / h;
+    out[i] = v * 0.5 + 0.08 * noise();
+  }
+  return out;
+}
+
+// Рольставня: металлический дребезг ламелей и удар в конце.
+function makeShutter(sr) {
+  const dur = 0.7;
+  const n = Math.floor(sr * dur);
+  const out = new Float32Array(n);
+  let hp = 0, prev = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const x = noise();
+    hp = 0.9 * (hp + x - prev);
+    prev = x;
+    const rattle = 0.5 + 0.5 * Math.sign(Math.sin(2 * Math.PI * 38 * t));
+    out[i] = hp * rattle * 0.35 * Math.min(1, t / 0.02) * (t < 0.45 ? 1 : 0.3);
+    if (t > 0.45) {
+      const u = t - 0.45;
+      out[i] += Math.exp(-u * 20) * (Math.sin(2 * Math.PI * 90 * u) + 0.5 * Math.sin(2 * Math.PI * 410 * u) + 0.4 * x);
+    }
+  }
+  return out;
+}
+
+// Монета: два звонких тона.
+function makeCoin(sr) {
+  const out = new Float32Array(Math.floor(sr * 0.5));
+  for (const [at, f] of [[0, 988], [0.08, 1319]]) {
+    const a = Math.floor(at * sr);
+    for (let i = 0; a + i < out.length; i++) {
+      const t = i / sr;
+      out[a + i] += (Math.sin(2 * Math.PI * f * t) + 0.3 * Math.sin(2 * Math.PI * f * 2 * t)) * Math.exp(-t * (at ? 7 : 30));
+    }
+  }
+  return out;
+}
+
+// Штамп: глухой удар по столу.
+function makeStamp(sr) {
+  const out = new Float32Array(Math.floor(sr * 0.35));
+  for (let i = 0; i < out.length; i++) {
+    const t = i / sr;
+    out[i] = (Math.sin(2 * Math.PI * (110 - 120 * t) * t) + 0.5 * noise() * Math.exp(-t * 60)) * Math.exp(-t * 16);
   }
   return out;
 }
