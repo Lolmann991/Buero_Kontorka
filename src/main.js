@@ -7,12 +7,15 @@ import * as desk from './ui/desk.js';
 import * as cameras from './ui/cameras.js';
 import * as teams from './ui/teams.js';
 import * as screens from './ui/screens.js';
+import * as decoUi from './ui/deco.js';
 import * as tickets from './tickets.js';
 import * as glitches from './glitches.js';
 import * as calls from './calls.js';
 import * as graph from './graph.js';
 import * as mr404 from './enemies/mr404.js';
 import * as coins from './coins.js';
+import * as coffee from './coffee.js';
+import './deco.js';
 import { initDebug } from './debug.js';
 
 const ENEMY_MODULES = { mr404 };   // id врага из nights.json -> модуль src/enemies/<id>.js
@@ -325,7 +328,7 @@ on('tick', ({ dt }) => {
 });
 
 // Враги получают звонки и команды отладки через onEvent, а не подписываются сами.
-for (const name of ['call:start', 'call:end', 'debug:enemy']) {
+for (const name of ['call:start', 'call:end', 'debug:enemy', 'noise']) {
   on(name, (payload) => enemies.forEach((e) => e.onEvent(name, payload)));
 }
 
@@ -342,6 +345,14 @@ on('night:end', () => { enemies = []; });
 on('night:start', () => coins.start(nights[state.night]?.coins ?? {}));
 on('tick', () => { if (state.running) coins.update(); });
 on('coin:collect', () => audio.play('coin'));
+
+// ---------- усталость и кофемашина ----------
+on('night:start', () => coffee.start(nights[state.night]?.fatigue ?? {}));
+on('tick', ({ dt }) => { if (state.running) coffee.update(dt); });
+let brewSnd = null;
+on('coffee:start', () => { audio.stop(brewSnd); brewSnd = audio.play('coffee_brew', { pan: DOOR_PAN.left }); });
+on('coffee:done', () => { brewSnd = null; audio.play('coffee_done', { pan: DOOR_PAN.left }); });
+on('coffee:cancel', () => { audio.stop(brewSnd); brewSnd = null; });
 
 // Прослушанная запись ночи открывает привязанные к ней записи архива (flags.unlocked: 'call:<id>').
 // Открывает только запись, прослушанная до конца: call:end story с outcome 'finished' (решено разработчиком).
@@ -549,6 +560,7 @@ async function boot() {
   cameras.mount(document.getElementById('monitor-left'), ctx);
   teams.mount(document.getElementById('monitor-right'), ctx);
   screens.mount(document.getElementById('app'), ctx);
+  decoUi.mount(document.getElementById('app'), ctx);
   initDebug();
 
   requestAnimationFrame(frame);

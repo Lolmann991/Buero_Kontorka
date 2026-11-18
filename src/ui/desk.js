@@ -326,7 +326,8 @@ function buildSide(parent, side, ctx) {
     'stroke-width': 7, fill: 'none', 'stroke-linecap': 'round' }, s);
 
   // пробковая доска с пожелтевшими листками
-  const board = svgEl('g', { opacity: 0.75 }, s);
+  const by = flip ? 0 : -130;                        // слева доска выше: под ней кофемашина
+  const board = svgEl('g', { opacity: 0.75, transform: `translate(0 ${by})` }, s);
   svgEl('rect', { x: X(60, 190), y: 240, width: 190, height: 240, fill: '#2a2014', stroke: '#16120c', 'stroke-width': 8 }, board);
   img(grimeTexture(95, 120, seed + 3, { blots: 30, blotRGB: '10,6,2', blotA: 0.4, streaks: 0, scratches: 5, speck: 0.15 }),
     X(64, 182), 244, 182, 232, { parent: board });
@@ -454,6 +455,8 @@ function buildSide(parent, side, ctx) {
   // темнота у стыка с фото стола: шов уходит в тень
   svgEl('rect', { x: flip ? 0 : SIDE_W - 160, y: 0, width: 160, height: SIDE_H, fill: `url(#${id('seam')})` }, s);
 
+  const coffee = flip ? null : buildCoffee(s, wrap, { defs, id, img, seed, t, emit });
+
   // панель с кнопками (HTML поверх SVG, в процентах стены)
   const plate = el('div', 'door-plate', wrap);
   plate.style.left = `${(X(PLATE.x, PLATE.w) / SIDE_W) * 100}%`;
@@ -478,7 +481,131 @@ function buildSide(parent, side, ctx) {
   doorBtn.setAttribute('aria-label', t(`office.door.${side}`));
   lightBtn.setAttribute('aria-label', t(`office.light.${side}`));
 
-  return { wrap, doorBtn, lightBtn, enemy: false, closed: null, lit: null };
+  return { wrap, doorBtn, lightBtn, coffee, enemy: false, closed: null, lit: null };
+}
+
+// ---------- кофемашина на тумбе у левой стены ----------
+const COFFEE = { x: 95, y: 405, w: 130, h: 192 };          // корпус машины (координаты левой стены)
+const CABINET = { x: 48, y: 596, w: 224, h: 204 };
+
+function buildCoffee(s, wrap, { defs, id, img, seed, t, emit }) {
+  const C = COFFEE, K = CABINET;
+  const g = svgEl('g', { class: 'coffee-svg' }, s);
+  const lin = (name, stops, x2 = 0, y2 = 1) => {
+    const gr = svgEl('linearGradient', { id: id(name), x1: 0, y1: 0, x2, y2 }, defs);
+    for (const [o, c] of stops) svgEl('stop', { offset: o, 'stop-color': c }, gr);
+    return `url(#${id(name)})`;
+  };
+  // тумба: тёмный ламинат, царапины, кофейные потёки
+  svgEl('rect', { x: K.x, y: K.y, width: K.w, height: K.h, fill: lin('cab', [[0, '#2e271d'], [1, '#17130e']]) }, g);
+  svgEl('rect', { x: K.x - 6, y: K.y - 8, width: K.w + 12, height: 12, rx: 2, fill: '#3b3428' }, g);
+  svgEl('line', { x1: K.x + K.w / 2, y1: K.y + 10, x2: K.x + K.w / 2, y2: K.y + K.h - 18, stroke: '#0b0906', 'stroke-width': 3 }, g);
+  for (const hx of [K.x + K.w / 2 - 22, K.x + K.w / 2 + 12]) {
+    svgEl('rect', { x: hx, y: K.y + 60, width: 10, height: 34, rx: 3, fill: '#5d5a52' }, g);
+  }
+  svgEl('rect', { x: K.x, y: K.y + K.h - 18, width: K.w, height: 18, fill: '#0b0a08' }, g);
+  img(grimeTexture(112, 102, seed + 9, { blots: 22, blotRGB: '40,22,8', blotA: 0.5, streaks: 18, streakTop: true,
+    streakRGB: '55,30,10', streakA: 0.5, scratches: 22, speck: 0.03, lightSpeck: 0.05 }), K.x, K.y - 8, K.w, K.h + 8, { parent: g });
+  // корпус машины
+  svgEl('rect', { x: C.x + 12, y: C.y - 8, width: C.w - 24, height: 22, rx: 4, fill: 'rgba(130,170,180,0.22)', stroke: 'rgba(160,190,200,0.25)' }, g); // бак
+  svgEl('rect', { x: C.x, y: C.y + 10, width: C.w, height: C.h - 10, rx: 9, fill: lin('mach', [[0, '#26282b'], [0.5, '#151618'], [1, '#0b0c0d']], 1, 0) }, g);
+  svgEl('rect', { x: C.x + 16, y: C.y + 34, width: C.w - 32, height: 30, rx: 3, fill: '#020403', stroke: '#2f3233', 'stroke-width': 2 }, g); // дисплей
+  for (const bx of [C.x + 30, C.x + 52, C.x + 74, C.x + 96]) {
+    svgEl('circle', { cx: bx, cy: C.y + 78, r: 6, fill: '#3a3c3e', stroke: '#0a0a0a', 'stroke-width': 1.5 }, g);
+  }
+  svgEl('rect', { x: C.x + 20, y: C.y + 94, width: C.w - 40, height: 88, rx: 4, fill: '#050505' }, g);           // ниша
+  svgEl('rect', { x: C.x + C.w / 2 - 12, y: C.y + 94, width: 24, height: 12, rx: 2, fill: '#8d9092' }, g);      // носик
+  svgEl('rect', { class: 'coffee-stream', x: C.x + C.w / 2 - 2, y: C.y + 106, width: 4, height: 44, fill: '#3b2412' }, g);
+  // кружка «на работе» со сколом
+  svgEl('rect', { x: C.x + C.w / 2 - 20, y: C.y + 146, width: 40, height: 36, rx: 4, fill: '#b9b3a2' }, g);
+  svgEl('path', { d: `M${C.x + C.w / 2 + 20},${C.y + 154} q14,2 12,12 q-2,9 -12,8`, fill: 'none', stroke: '#b9b3a2', 'stroke-width': 5 }, g);
+  svgEl('path', { d: `M${C.x + C.w / 2 - 20},${C.y + 146} l8,0 l-4,6 z`, fill: '#3a3a36' }, g);
+  svgEl('rect', { x: C.x + 12, y: C.y + 182, width: C.w - 24, height: 10, rx: 2, fill: '#5a5d60' }, g);         // поддон
+  for (let k = 0; k < 6; k++) svgEl('rect', { x: C.x + 18 + k * 16, y: C.y + 184, width: 10, height: 2, fill: '#202224' }, g);
+  img(grimeTexture(65, 96, seed + 10, { blots: 18, blotRGB: '50,30,12', blotA: 0.45, streaks: 10, streakRGB: '60,32,10',
+    streakA: 0.4, scratches: 16, scratchLen: 15, speck: 0.04, lightSpeck: 0.1 }), C.x, C.y + 10, C.w, C.h - 10, { parent: g });
+  // записка «Entkalken!»
+  const nt = svgEl('g', { transform: `rotate(9 ${C.x + C.w - 12} ${C.y + 30})` }, g);
+  svgEl('rect', { x: C.x + C.w - 40, y: C.y + 14, width: 62, height: 34, fill: '#c9b84a', opacity: 0.8 }, nt);
+  const tx = svgEl('text', { x: C.x + C.w - 9, y: C.y + 35, 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700,
+    fill: '#2a250a', 'font-family': '"Marker Felt", "Segoe Print", "Comic Sans MS", cursive' }, nt);
+  tx.textContent = t('coffee.note');
+  // пар над кружкой (виден, пока варит)
+  const steam = svgEl('g', { class: 'coffee-steam' }, g);
+  for (const dx of [-8, 4, 14]) {
+    svgEl('path', { d: `M${C.x + C.w / 2 + dx},${C.y + 140} q-8,-14 0,-26 q8,-12 0,-26`, fill: 'none',
+      stroke: 'rgba(220,230,225,0.35)', 'stroke-width': 4, 'stroke-linecap': 'round' }, steam);
+  }
+
+  // кнопка поверх машины (HTML) и надпись дисплея
+  const pct = (v, total) => `${((v / total) * 100).toFixed(2)}%`;
+  const btn = el('button', 'coffee-btn', wrap);
+  btn.type = 'button';
+  btn.style.left = pct(C.x - 8, SIDE_W);
+  btn.style.top = pct(C.y - 12, SIDE_H);
+  btn.style.width = pct(C.w + 16, SIDE_W);
+  btn.style.height = pct(C.h + 16, SIDE_H);
+  btn.setAttribute('aria-label', t('coffee.label'));
+  const disp = el('span', 'coffee-disp', btn);
+  disp.style.top = `${((34 + 12) / (C.h + 16)) * 100}%`;
+  disp.style.height = `${(30 / (C.h + 16)) * 100}%`;
+  disp.style.left = `${((16 + 8) / (C.w + 16)) * 100}%`;
+  disp.style.right = disp.style.left;
+  el('span', 'coffee-tip', btn).textContent = t('coffee.tip');
+  btn.addEventListener('pointerup', (e) => { if (e.button <= 0) emit('intent:coffee'); });
+  return { btn, disp, last: '' };
+}
+
+function syncCoffee(state, t) {
+  const c = els.sides.left.coffee;
+  if (!c) return;
+  const k = state.coffee;
+  let text, mode;
+  if (!state.running || state.tokens <= 0) { text = t('coffee.off'); mode = 'off'; }
+  else if (k.brewing) { text = t('coffee.brewing', { s: Math.ceil(k.left) }); mode = 'brew'; }
+  else if (k.cooldown > 0) { text = t('coffee.wait', { s: Math.ceil(k.cooldown) }); mode = 'wait'; }
+  else { text = t('coffee.ready'); mode = 'ready'; }
+  if (c.last !== text) { c.last = text; c.disp.textContent = text; }
+  if (c.mode !== mode) {
+    c.mode = mode;
+    c.btn.dataset.mode = mode;
+    els.sides.left.wrap.classList.toggle('is-brewing', mode === 'brew');
+  }
+}
+
+// ---------- усталость: темнеет по краям, моргание, на 100 — микросон ----------
+function buildTired(stage) {
+  const root = el('div', 'tired', stage);
+  const veil = el('div', 'tired-veil', root);
+  el('div', 'lid lid--top', root);
+  el('div', 'lid lid--bottom', root);
+  return { root, veil, next: 8, blink: 0, dur: 0, lid: -1, veilV: -1 };
+}
+
+function updateTired(state, dt) {
+  const T = els.tired;
+  const f = state.running ? state.fatigue : 0;
+  const veil = Math.round(Math.max(0, (f - 45) / 55) * 50) / 50;
+  if (veil !== T.veilV) { T.veilV = veil; T.veil.style.opacity = String(veil); }
+  let lid = 0;
+  if (T.blink > 0) {                                  // идёт моргание: быстро закрыть, подержать, открыть
+    T.blink -= dt;
+    const k = 1 - T.blink / T.dur;
+    lid = k < 0.25 ? k / 0.25 : k > 0.7 ? (1 - k) / 0.3 : 1;
+  } else if (f >= 55) {
+    T.next -= dt;
+    if (T.next <= 0) {
+      const q = (f - 55) / 45;                        // 0..1
+      const sleep = f >= 97 && Math.random() < 0.5;   // микросон
+      T.dur = sleep ? 2.2 + Math.random() : 0.2 + q * 0.5;
+      T.blink = T.dur;
+      T.next = (sleep ? 6 : 14 - 9 * q) * (0.7 + Math.random() * 0.6);
+    }
+  } else {
+    T.next = Math.max(T.next, 4);
+  }
+  lid = Math.round(Math.min(1, Math.max(0, lid)) * 40) / 40;
+  if (lid !== T.lid) { T.lid = lid; T.root.style.setProperty('--lid', String(lid)); }
 }
 
 // Плашка токенов и нагрузки поверх кабинета (в кадре камеры и на карте свои).
@@ -495,9 +622,13 @@ function buildOfficeHud(parent, t) {
   const bar = el('span', 'hud-load__bar', row2);
   const segs = [];
   for (let i = 0; i < HUD_SEGMENTS; i++) segs.push(el('i', i < 2 ? 'lv-g' : i < 4 ? 'lv-y' : 'lv-r', bar));
+  const tiredRow = el('div', 'oh-row', hud);
+  const tiredLabel = el('span', 'oh-label', tiredRow);
+  tiredLabel.textContent = t('office.tired');
+  const tiredFill = el('i', '', el('div', 'oh-bar oh-bar--tired', tiredRow));
   const doors = el('div', 'oh-doors', hud);
   const info = el('div', 'oh-info', hud);
-  return { hud, num, fill, segs, doors, loadLabel, info, last: {} };
+  return { hud, num, fill, segs, doors, loadLabel, info, tiredLabel, tiredFill, last: {} };
 }
 
 function syncOffice(state, t) {
@@ -551,6 +682,13 @@ function syncOffice(state, t) {
   const word = (s) => t(state.doors[s] ? 'cams.map.doorClosed' : 'cams.map.doorOpen');
   const dt = t('cams.map.doors', { l: word('left'), r: word('right') });
   if (h.last.doors !== dt) { h.last.doors = dt; h.doors.textContent = dt; }
+  const tired = Math.round(state.fatigue);
+  if (h.last.tired !== tired) {
+    h.last.tired = tired;
+    h.tiredFill.style.width = `${tired}%`;
+    h.tiredLabel.classList.toggle('is-over', tired >= 75);
+  }
+  syncCoffee(state, t);
   const info = t('office.info', { n: state.night, c: state.coinsNight });
   if (h.last.info !== info) { h.last.info = info; h.info.textContent = info; }
   syncCoins(state);
@@ -616,6 +754,7 @@ function onKey(e, ctx) {
     case ' ': emit('intent:view', { view: v === 'cams' ? 'desk' : 'cams' }); break;
     case 't': if (side) emit('intent:door', { side }); else handled = false; break;
     case 'l': if (side) emit('intent:light', { side }); else handled = false; break;
+    case 'c': if (v === 'left') emit('intent:coffee'); else handled = false; break;
     default: handled = false;
   }
   if (handled) e.preventDefault();
@@ -1126,6 +1265,7 @@ export function mount(rootEl, ctx) {
   buildFxAbove(els.scene, els.stage);
   renderClock(state);
 
+  els.tired = buildTired(els.stage);
   els.hud = buildOfficeHud(els.stage, t);
   els.coinLabel = t('coins.label');
   els.emit = emit;
@@ -1167,6 +1307,10 @@ export function mount(rootEl, ctx) {
   els.start.insertBefore(els.menuStars, els.startHint);
   els.start.insertBefore(els.menuStats, els.startHint);
   els.start.insertBefore(els.menuWeek, els.startHint);
+  els.shopBtn = el('button', 'start-btn start-btn--ghost', els.start);
+  els.shopBtn.type = 'button';
+  els.shopBtn.textContent = t('shop.open');
+  els.shopBtn.addEventListener('pointerup', (e) => { if (e.button <= 0) emit('ui:shop'); });
   els.newGameBtn = el('button', 'start-btn start-btn--ghost', els.start);
   els.newGameBtn.type = 'button';
   els.newGameBtn.textContent = t('menu.newGame');
@@ -1223,6 +1367,7 @@ export function mount(rootEl, ctx) {
       updateShutdown(dt);
       updateScare(dt, ctx);
       syncOffice(state, t);
+      updateTired(state, dt);
     }),
     on('jumpscare', ({ enemyId }) => startScare(enemyId)),
     on('glitch', ({ type }) => {

@@ -96,7 +96,8 @@
         "doorKnockSec": [
           1.8,
           2.6
-        ]
+        ],
+        "noiseSteps": 4
       }
     },
     "glitches": {
@@ -130,6 +131,14 @@
       "count": 3,
       "fromSec": 20,
       "toSec": 330
+    },
+    "fatigue": {
+      "start": 0,
+      "perSec": 0.32,
+      "coffee": 65,
+      "brewSec": 4.5,
+      "cooldownSec": 25,
+      "noiseAt": "s_hall1"
     }
   },
   "2": {
@@ -229,7 +238,8 @@
         "doorKnockSec": [
           1.8,
           2.6
-        ]
+        ],
+        "noiseSteps": 4
       }
     },
     "glitches": {
@@ -261,6 +271,14 @@
       "count": 3,
       "fromSec": 20,
       "toSec": 330
+    },
+    "fatigue": {
+      "start": 0,
+      "perSec": 0.36,
+      "coffee": 65,
+      "brewSec": 4.5,
+      "cooldownSec": 25,
+      "noiseAt": "s_hall1"
     }
   },
   "3": {
@@ -360,7 +378,8 @@
         "doorKnockSec": [
           1.8,
           2.6
-        ]
+        ],
+        "noiseSteps": 4
       }
     },
     "glitches": {
@@ -392,6 +411,14 @@
       "count": 4,
       "fromSec": 20,
       "toSec": 330
+    },
+    "fatigue": {
+      "start": 0,
+      "perSec": 0.42,
+      "coffee": 65,
+      "brewSec": 4.5,
+      "cooldownSec": 25,
+      "noiseAt": "s_hall1"
     }
   },
   "4": {
@@ -491,7 +518,8 @@
         "doorKnockSec": [
           1.8,
           2.6
-        ]
+        ],
+        "noiseSteps": 4
       }
     },
     "glitches": {
@@ -523,6 +551,14 @@
       "count": 4,
       "fromSec": 20,
       "toSec": 330
+    },
+    "fatigue": {
+      "start": 0,
+      "perSec": 0.48,
+      "coffee": 65,
+      "brewSec": 4.5,
+      "cooldownSec": 25,
+      "noiseAt": "s_hall1"
     }
   },
   "5": {
@@ -622,7 +658,8 @@
         "doorKnockSec": [
           1.8,
           2.6
-        ]
+        ],
+        "noiseSteps": 4
       }
     },
     "glitches": {
@@ -654,6 +691,14 @@
       "count": 5,
       "fromSec": 20,
       "toSec": 330
+    },
+    "fatigue": {
+      "start": 0,
+      "perSec": 0.55,
+      "coffee": 65,
+      "brewSec": 4.5,
+      "cooldownSec": 25,
+      "noiseAt": "s_hall1"
     }
   }
 }

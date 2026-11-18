@@ -24,6 +24,7 @@ const DEFAULTS = {
     bangSec: [1.4, 2.4] },
   slaGood: 60, slaBad: 40, whistleChancePer10s: 0.1,
   doorKnockSec: [1.8, 2.6],   // пауза между стуком и входом с южного этажа в зал
+  noiseSteps: 4,              // на сколько шагов он подходит на шум кофемашины
 };
 
 const KNOCK_BEFORE_SEC = 6;          // стук в стеклянную дверь за 6 с до появления
@@ -342,9 +343,30 @@ export function create(cfg, ctx) {
 
   function arriveLure() {
     // Пришёл в комнату за твоей спиной по звонку: окно атаки начинается как обычно.
-    if (enemy.pos === 's_hall3') { lure = null; enterDwell(); return; }
+    // На шум кофемашины он идёт к залу у левой двери и оттуда сразу начинает атаку.
+    if (enemy.pos === 's_hall3' || (lure.noise && enemy.pos === 's_hall1')) { lure = null; enterDwell(); return; }
     lure.stage = 'linger';
     timer = lure.lingerSec;
+    setStatus('idle');
+  }
+
+  // ---------- шум из кабинета (кофемашина) ----------
+  // Шум зовёт его к кабинету: ещё не пришёл — придёт раньше; в туалете или на перерыве — выйдет скорее;
+  // бродит — идёт к месту шума (до noiseSteps шагов), а дойдя до зала у кабинета, начинает атаку.
+  function onNoise(payload) {
+    const at = payload?.at;
+    if (!at) return;
+    if (mode === 'absent') { appearT = Math.max(appearT, C.startDelaySec - KNOCK_BEFORE_SEC - 2); return; }
+    if (mode === 'toilet' || mode === 'break') { timer = Math.min(timer, 3); return; }
+    if (mode !== 'pause' && mode !== 'dash' && mode !== 'lured') return;   // уже у двери или в окне атаки
+    const path = routeTo(at);
+    if (!path) return;
+    returning = false;
+    goFloor = false;
+    side = null;
+    lure = { path: path.slice(0, C.noiseSteps), stage: 'react', lingerSec: 4, noise: true };
+    mode = 'lured';
+    timer = range(C.lure.reactSec);
     setStatus('idle');
   }
 
@@ -365,6 +387,7 @@ export function create(cfg, ctx) {
 
   function onEvent(name, payload) {
     if (name === 'call:start' && payload?.kind === 'lure') { onLure(payload); return; }
+    if (name === 'noise') { onNoise(payload); return; }
     if (name !== 'debug:enemy') return;
     switch (payload?.action) {
       case 'freeze':

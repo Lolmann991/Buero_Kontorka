@@ -779,6 +779,71 @@
       background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.25) 0 1px, transparent 1px 3px); }
     .scare[data-phase="black"] .scare-tint, .scare[data-phase="flash"] .scare-tint { display: none; }
 
+    /* ---------- кофемашина ---------- */
+    .coffee-btn { position: absolute; z-index: 2; padding: 0; margin: 0; border: 0; background: transparent; cursor: pointer;
+      border-radius: 0.6cqw; touch-action: manipulation; }
+    .coffee-btn:hover, .coffee-btn:focus-visible { box-shadow: 0 0 0 2px rgba(255, 220, 160, 0.35), 0 0 2cqw rgba(255, 200, 120, 0.15); }
+    .coffee-disp { position: absolute; display: grid; place-items: center; overflow: hidden; white-space: nowrap;
+      color: #7dff9a; font: 700 max(8px, 0.85cqw) / 1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.06em;
+      text-shadow: 0 0 6px rgba(125, 255, 154, 0.7); pointer-events: none; }
+    .coffee-btn[data-mode="brew"] .coffee-disp { color: #ffd27a; text-shadow: 0 0 6px rgba(255, 200, 100, 0.7); animation: cam-blink 0.6s step-end infinite; }
+    .coffee-btn[data-mode="wait"] .coffee-disp { color: #ff8a6a; text-shadow: 0 0 6px rgba(255, 120, 90, 0.6); }
+    .coffee-btn[data-mode="off"] .coffee-disp { color: transparent; text-shadow: none; }
+    .coffee-tip { position: absolute; left: 50%; top: -2.4cqw; transform: translateX(-50%); padding: 0.3cqw 0.7cqw; white-space: nowrap;
+      background: rgba(0, 0, 0, 0.75); color: #f2dcb0; font: 700 max(9px, 0.9cqw) / 1 ui-monospace, Menlo, monospace;
+      border: 1px solid rgba(255, 220, 160, 0.4); opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    .coffee-btn:hover .coffee-tip, .coffee-btn:focus-visible .coffee-tip { opacity: 1; }
+    .side .coffee-steam, .side .coffee-stream { opacity: 0; transition: opacity 0.4s; }
+    .side.is-brewing .coffee-stream { opacity: 1; }
+    .side.is-brewing .coffee-steam { opacity: 1; animation: steam-rise 1.6s ease-in-out infinite; }
+    @keyframes steam-rise { 0% { transform: translateY(6px); opacity: 0.2; } 50% { opacity: 1; } 100% { transform: translateY(-14px); opacity: 0; } }
+
+    /* ---------- усталость: края темнеют, веки закрываются ---------- */
+    .tired { position: absolute; inset: 0; z-index: 2; pointer-events: none; --lid: 0; }
+    .tired-veil { position: absolute; inset: 0; opacity: 0;
+      background: radial-gradient(ellipse at 50% 48%, transparent 28%, rgba(4, 2, 10, 0.75) 72%, rgba(0, 0, 0, 0.95) 100%); }
+    .lid { position: absolute; left: -5%; right: -5%; height: 52%; background: #020102; }
+    .lid--top { top: 0; border-radius: 0 0 50% 50% / 0 0 18% 18%; transform: translateY(calc((var(--lid) - 1) * 100%)); }
+    .lid--bottom { bottom: 0; border-radius: 50% 50% 0 0 / 18% 18% 0 0; transform: translateY(calc((1 - var(--lid)) * 100%)); }
+    .oh-bar--tired { flex: 1; max-width: 55%; }
+    .oh-bar--tired i { background: #9a6aff !important; }
+
+    /* ---------- украшения ---------- */
+    .deco-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+    .deco-bulb { animation: bulb 2.4s ease-in-out infinite; }
+    @keyframes bulb { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .deco-blob { animation: blob 7s ease-in-out infinite alternate; }
+    .deco-blob--b { animation-duration: 9s; animation-delay: -3s; }
+    .deco-blob--c { animation-duration: 11s; animation-delay: -6s; }
+    @keyframes blob { from { transform: translateY(14px); } to { transform: translateY(-50px); } }
+    .deco-lava-glow { animation: bulb 5s ease-in-out infinite; }
+    .stage.is-nopower .deco-bulb, .stage.is-nopower .deco-lava-glow { animation: none; opacity: 0.1; }
+    @media (prefers-reduced-motion: reduce) {
+      .deco-bulb, .deco-blob, .deco-lava-glow, .side.is-brewing .coffee-steam { animation: none; }
+    }
+
+    /* ---------- магазин ---------- */
+    .shop { position: absolute; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center;
+      padding: 1rem; background: rgba(0, 0, 0, 0.92); overflow-y: auto; }
+    .shop[hidden] { display: none; }
+    .shop-box { width: min(96vw, 860px); max-height: 100%; display: flex; flex-direction: column; gap: 0.6rem; }
+    .shop-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+    .shop-title { margin: 0; font-size: clamp(1.3rem, 4vw, 2rem); letter-spacing: 0.06em; }
+    .shop-coins { color: #f2c230; font-weight: 700; font-size: 1.1rem; }
+    .shop-hint { margin: 0; opacity: 0.7; font-size: 0.85rem; }
+    .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.7rem; overflow-y: auto; }
+    .shop-card { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.6rem; border: 1px solid #2c3a2c; border-radius: 0.4rem;
+      background: linear-gradient(#141a14, #0b0e0b); }
+    .shop-card.is-owned { border-color: #4a6a3a; }
+    .shop-pv { width: 100%; height: 90px; background: radial-gradient(ellipse at center, #1e241e, #0a0c0a); border-radius: 0.3rem; }
+    .shop-name { font-size: 0.95rem; }
+    .shop-desc { margin: 0; font-size: 0.75rem; opacity: 0.7; flex: 1; }
+    .shop-btn { min-height: 2.4rem; border: 2px solid #b8920e; border-radius: 0.3rem; background: #2a2208; color: #ffe08a;
+      font: inherit; font-weight: 700; touch-action: manipulation; cursor: pointer; }
+    .shop-btn:disabled { border-color: #444; background: #151515; color: #777; cursor: not-allowed; }
+    .shop-btn--ghost { border-color: #3a5a3a; background: transparent; color: #cfe9d6; }
+    .shop-close { align-self: center; }
+
     /* ---------- монеты ---------- */
     .coin-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
     .coin {

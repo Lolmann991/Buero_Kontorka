@@ -253,6 +253,8 @@ const SYNTH = {
   shutter: { volume: 0.8, make: makeShutter },          // рольставня двери
   coin: { volume: 0.7, make: makeCoin },                // монета подобрана
   stamp: { volume: 0.9, make: makeStamp },              // штамп на чеке
+  coffee_brew: { volume: 1.0, make: makeCoffeeBrew },   // кофемашина: мельница, насос, шипение (громко — слышно в коридоре)
+  coffee_done: { volume: 0.6, make: makeCoffeeDone },   // кофе готов: три писка
 };
 
 function ensureSynth(id) {
@@ -430,6 +432,46 @@ function makeShutter(sr) {
     if (t > 0.45) {
       const u = t - 0.45;
       out[i] += Math.exp(-u * 20) * (Math.sin(2 * Math.PI * 90 * u) + 0.5 * Math.sin(2 * Math.PI * 410 * u) + 0.4 * x);
+    }
+  }
+  return out;
+}
+
+// Кофемашина 4,5 с: жужжание мельницы (1,3 с), потом гул насоса с бульканьем и шипением пара.
+function makeCoffeeBrew(sr) {
+  const dur = 4.5;
+  const n = Math.floor(sr * dur);
+  const out = new Float32Array(n);
+  let lp = 0, ph = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const x = noise();
+    let v = 0;
+    if (t < 1.3) {                                   // мельница: пила 150 Гц + хруст
+      ph += 2 * Math.PI * (150 + 20 * Math.sin(2 * Math.PI * 7 * t)) / sr;
+      const saw = ((ph / (2 * Math.PI)) % 1) * 2 - 1;
+      v = (0.55 * saw + 0.45 * x * (0.5 + 0.5 * Math.sin(2 * Math.PI * 31 * t))) * Math.min(1, t / 0.05) * Math.min(1, (1.3 - t) / 0.05);
+    } else {                                         // насос + бульканье + пар
+      const u = t - 1.3;
+      lp += 0.06 * (x - lp);
+      const pump = 0.35 * Math.sin(2 * Math.PI * 50 * u) * (0.6 + 0.4 * Math.sin(2 * Math.PI * 3 * u));
+      const gurgle = Math.sin(2 * Math.PI * (220 + 160 * Math.sin(2 * Math.PI * 9 * u)) * u) * Math.max(0, Math.sin(2 * Math.PI * 4.5 * u)) ** 6 * 0.3;
+      const hiss = x * 0.35 * Math.min(1, u / 1.5);
+      v = (pump + gurgle + hiss + lp * 0.8) * Math.min(1, (dur - t) / 0.3);
+    }
+    out[i] = v;
+  }
+  return out;
+}
+
+// Кофе готов: три коротких писка.
+function makeCoffeeDone(sr) {
+  const out = new Float32Array(Math.floor(sr * 0.75));
+  for (const at of [0, 0.22, 0.44]) {
+    const a = Math.floor(at * sr);
+    for (let i = 0; i < sr * 0.12 && a + i < out.length; i++) {
+      const t = i / sr;
+      out[a + i] += Math.sign(Math.sin(2 * Math.PI * 1900 * t)) * 0.5 * Math.min(1, t / 0.005) * Math.min(1, (0.12 - t) / 0.01);
     }
   }
   return out;
