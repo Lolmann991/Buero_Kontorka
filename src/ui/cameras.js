@@ -82,7 +82,7 @@ function buildMap(parent, ctx) {
     const shapes = [m, ...m.extra].map((r) =>
       svg('rect', { class: cls, x: r.x, y: r.y, width: r.w, height: r.h }, canvas));
     els.rooms[id] = shapes;
-    if (isBlind(id) && id !== PLAYER_POS) {
+    if (isBlind(id) && id.includes('toilet')) {   // слепые зоны без камер; подписаны только туалеты
       const wc = svg('text', { class: 'wc', x: m.x + m.w / 2, y: m.y + m.h / 2 }, canvas);
       wc.textContent = T('cams.map.wc');
     }
