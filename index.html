@@ -53,6 +53,140 @@
       transform: translate(-50%, -50%);
       container-type: inline-size;
       background: #000;
+      overflow: hidden;              /* стены с дверями лежат за краями кадра */
+    }
+
+    /* ---------- кабинет: комната шире кадра, взгляд двигает её целиком ---------- */
+    .room {
+      position: absolute;
+      inset: 0;
+      transform-origin: var(--zoom-ox, 26.7%) var(--zoom-oy, 39.4%);
+      transform: translate(0, 0) scale(1);
+      transition: transform 0.42s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+    .stage[data-view="left"] .room { transform: translate(var(--side-frac, 70%), 0) scale(1); }
+    .stage[data-view="right"] .room { transform: translate(calc(-1 * var(--side-frac, 70%)), 0) scale(1); }
+    .stage[data-view="cams"] .room { transform: translate(var(--zoom-tx), var(--zoom-ty)) scale(var(--zoom-s)); }
+    .scene { position: absolute; inset: 0; }
+    .side { position: absolute; top: 0; width: var(--side-frac, 70%); height: 100%; overflow: hidden; background: #050606; }
+    .side--left { right: 100%; }
+    .side--right { left: 100%; }
+    .side-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .side .hall-dark { opacity: 0.93; transition: opacity 0.12s; }
+    .side .hall-cone { opacity: 0; transition: opacity 0.12s; }
+    .side.is-lit .hall-dark { opacity: 0; }
+    .side.is-lit .hall-cone { opacity: 1; }
+    .side.is-lit.has-enemy .hall-dark { animation: hall-flick 1.3s steps(1) infinite; }
+    @keyframes hall-flick { 0%, 100% { opacity: 0; } 12% { opacity: 0.85; } 15% { opacity: 0; } 52% { opacity: 0.6; } 54% { opacity: 0; } }
+    .side .door-enemy { display: none; }
+    .side.has-enemy .door-enemy { display: inline; }
+    .side .door-shutter { transform: translateY(-700px); transition: transform 0.38s cubic-bezier(0.2, 0.7, 0.2, 1); }
+    .side.is-closed .door-shutter { transform: translateY(0); transition: transform 0.22s cubic-bezier(0.6, 0, 0.9, 0.4); }
+    .side .exit-sign { animation: exit-glow 4s ease-in-out infinite alternate; }
+    @keyframes exit-glow { from { opacity: 0.75; } to { opacity: 1; } }
+    .stage.is-nopower .exit-sign { animation: none; opacity: 0.15; }
+    .stage.is-dark .side-svg { filter: brightness(0.55); transition: filter 2s; }
+    /* панель с кнопками у двери */
+    .door-plate {
+      position: absolute; box-sizing: border-box;
+      display: flex; flex-direction: column; align-items: center; justify-content: space-evenly;
+      background: linear-gradient(180deg, #2a2f31, #16191a);
+      border: max(2px, 0.25cqw) solid #3d4447; border-radius: 0.6cqw;
+      box-shadow: 0 0 2cqw rgba(0, 0, 0, 0.8), inset 0 0 1cqw rgba(0, 0, 0, 0.6);
+    }
+    .door-btn {
+      position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.5cqw;
+      padding: 0; border: 0; background: none; cursor: pointer; touch-action: manipulation;
+      color: #b9c4bd; font: 700 max(10px, 1.15cqw) / 1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      letter-spacing: 0.08em;
+    }
+    .door-btn::after { content: ""; position: absolute; inset: -0.8cqw; }
+    .door-btn i {
+      display: block; width: max(34px, 5.2cqw); height: max(34px, 5.2cqw); border-radius: 50%;
+      border: max(2px, 0.3cqw) solid #0b0c0c; box-sizing: border-box;
+      box-shadow: inset 0 -0.4cqw 0.8cqw rgba(0, 0, 0, 0.6), 0 0.3cqw 0.6cqw rgba(0, 0, 0, 0.7);
+      transition: background 0.1s, box-shadow 0.1s;
+    }
+    .door-btn--door i { background: radial-gradient(circle at 40% 35%, #6a2020, #3a0b0b); }
+    .door-btn--door.is-on i { background: radial-gradient(circle at 40% 35%, #ff6a6a, #c01818);
+      box-shadow: 0 0 2cqw 0.4cqw rgba(255, 40, 40, 0.6), inset 0 -0.4cqw 0.8cqw rgba(0, 0, 0, 0.3); }
+    .door-btn--light i { background: radial-gradient(circle at 40% 35%, #4d524c, #222622); }
+    .door-btn--light.is-on i { background: radial-gradient(circle at 40% 35%, #ffffff, #cfe8d3);
+      box-shadow: 0 0 2cqw 0.4cqw rgba(220, 255, 230, 0.55), inset 0 -0.4cqw 0.8cqw rgba(0, 0, 0, 0.2); }
+    .door-btn.is-on span { color: #fff; }
+    .door-btn:active i { transform: translateY(1px) scale(0.97); }
+    .stage.is-nopower .door-btn { opacity: 0.35; pointer-events: none; }
+    /* края фото уходят в тень на стыке со стенами */
+    .fx-edge { top: 0; bottom: 0; width: 9%; }
+    .fx-edge--l { left: 0; background: linear-gradient(90deg, #000, rgba(0, 0, 0, 0.7) 35%, transparent); }
+    .fx-edge--r { right: 0; background: linear-gradient(-90deg, #000, rgba(0, 0, 0, 0.7) 35%, transparent); }
+    /* во время атаки свет в кабинете дёргается */
+    .stage.is-warning .scene, .stage.is-warning .side-svg { animation: room-panic 0.5s steps(1) infinite; }
+    @keyframes room-panic { 0%, 100% { filter: none; } 30% { filter: brightness(0.35); } 45% { filter: none; } 70% { filter: brightness(0.6) sepia(0.4) hue-rotate(-30deg); } }
+    /* монитор камер со стола: нажатие приближает к нему */
+    .mon-hit {
+      position: absolute; z-index: 2; padding: 0; margin: 0; border: 0; background: transparent; cursor: zoom-in;
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    .mon-hit__label {
+      margin-bottom: 1.2cqw; padding: 0.4cqw 0.9cqw; background: rgba(0, 0, 0, 0.7); color: #bfffcf;
+      border: 1px solid rgba(140, 255, 170, 0.5); font: 700 max(10px, 1.05cqw) / 1 ui-monospace, Menlo, Consolas, monospace;
+      letter-spacing: 0.08em; opacity: 0; transition: opacity 0.2s;
+    }
+    .mon-hit:hover .mon-hit__label, .mon-hit:focus-visible .mon-hit__label { opacity: 1; }
+    .mon-hit:hover { box-shadow: inset 0 0 0 2px rgba(140, 255, 170, 0.35); }
+    .stage:not([data-view="desk"]) .mon-hit, .stage:not(.is-running) .mon-hit { display: none; }
+    /* кнопки взгляда */
+    .nav-btn {
+      position: absolute; z-index: 3; padding: 0; display: none; align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, 0.45); color: #cfe9d6; border: 1px solid rgba(160, 230, 180, 0.3); border-radius: 0.5cqw;
+      font: 700 max(11px, 1.2cqw) / 1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.08em;
+      cursor: pointer; touch-action: manipulation; opacity: 0.7; transition: opacity 0.15s, background 0.15s;
+    }
+    .nav-btn:hover, .nav-btn:focus-visible { opacity: 1; background: rgba(20, 60, 35, 0.6); }
+    .nav-btn:active { background: rgba(31, 111, 31, 0.8); }
+    .nav-btn--left, .nav-btn--right { top: 30%; height: 40%; width: max(34px, 3.4cqw); font-size: max(14px, 1.8cqw); }
+    .nav-btn--left { left: 0.6cqw; }
+    .nav-btn--right { right: 0.6cqw; }
+    .nav-btn--cams, .nav-btn--back { left: 50%; bottom: 1cqw; transform: translateX(-50%);
+      min-width: max(120px, 14cqw); height: max(30px, 3.4cqw); padding: 0 1.5cqw; }
+    .stage.is-running[data-view="desk"] .nav-btn--left,
+    .stage.is-running[data-view="desk"] .nav-btn--right,
+    .stage.is-running[data-view="desk"] .nav-btn--cams,
+    .stage.is-running[data-view="right"] .nav-btn--left,
+    .stage.is-running[data-view="left"] .nav-btn--right,
+    .stage.is-running[data-view="cams"] .nav-btn--back { display: flex; }
+    .stage.is-running[data-view="cams"] .nav-btn--back { bottom: 0.5cqw; height: max(26px, 2.8cqw); }
+    .stage.is-nopower[data-view="desk"] .nav-btn--cams { display: none; }
+    /* Если окно шире 16:9, кадр обрезается сверху и снизу: нижние элементы поднимаем на эту обрезку */
+    .office-hud, .nav-btn--cams, .nav-btn--back { --crop: max(0px, calc((56.25cqw - 100vh) / 2)); }
+    @supports (height: 100dvh) {
+      .office-hud, .nav-btn--cams, .nav-btn--back { --crop: max(0px, calc((56.25cqw - 100dvh) / 2)); }
+    }
+    .office-hud { bottom: calc(var(--crop) + 1.2cqw) !important; }
+    .nav-btn--cams { bottom: calc(var(--crop) + 1cqw) !important; }
+    .stage.is-running[data-view="cams"] .nav-btn--back { bottom: calc(var(--crop) + 0.5cqw) !important; }
+    /* токены и нагрузка поверх кабинета */
+    .office-hud {
+      position: absolute; z-index: 3; left: 1.2cqw; bottom: 1.2cqw; width: max(170px, 17cqw);
+      padding: 0.7cqw 0.9cqw; box-sizing: border-box; display: none; flex-direction: column; gap: 0.45cqw;
+      background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(160, 230, 180, 0.25); border-radius: 0.4cqw;
+      color: #d6f0dc; font: 700 max(10px, 1.05cqw) / 1.1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      letter-spacing: 0.05em; pointer-events: none;
+    }
+    .stage.is-running:not([data-view="cams"]) .office-hud { display: flex; }
+    .oh-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6cqw; }
+    .oh-num { font-size: max(13px, 1.5cqw); }
+    .oh-label.is-over { color: #ff4040; animation: cam-blink 0.8s step-end infinite; }
+    .oh-bar, .map-hud__bar { height: max(6px, 0.6cqw); background: #111; border: 1px solid #3a4a3e; }
+    .oh-bar i, .map-hud__bar i { display: block; height: 100%; width: 0; background: #2ecc40; transition: width 0.4s; }
+    .oh-bar i.is-mid, .map-hud__bar i.is-mid { background: #ffd21f; }
+    .oh-bar i.is-bad, .map-hud__bar i.is-bad { background: #ff3030; }
+    .oh-doors { color: #a9c2b0; font-size: max(9px, 0.9cqw); white-space: nowrap; }
+    .office-hud .hud-load__bar i { width: max(8px, 0.9cqw); height: max(7px, 0.7cqw); }
+    @media (prefers-reduced-motion: reduce) {
+      .room, .side .door-shutter { transition-duration: 0.01s; }
+      .side.is-lit.has-enemy .hall-dark, .stage.is-warning .scene, .stage.is-warning .side-svg, .side .exit-sign { animation: none; }
     }
     .desk-photo {
       position: absolute;
@@ -236,6 +370,19 @@
     .cam-svg .you-text { fill: #ececec; font-size: 11px; font-weight: 700; text-anchor: middle; }
     .cam-svg .room--hl { stroke: #ffd24a; stroke-width: 2.4; fill: rgba(255, 210, 74, 0.22); }
     .cam-svg .room--nb { fill: rgba(255, 210, 74, 0.12); }
+    .cam-svg .you-door { fill: #2ecc40; }
+    .cam-svg .you-door.is-closed { fill: #ff3030; }
+    .map-hud {
+      position: absolute; z-index: 2; right: 10px; bottom: 8px; width: 196px; box-sizing: border-box;
+      padding: 6px 8px; display: flex; flex-direction: column; gap: 4px;
+      background: rgba(0, 0, 0, 0.75); border: 1px solid #4a4a4a;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.05em; color: #ececec; pointer-events: none;
+    }
+    .map-hud__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .map-hud__num { font-size: 15px; }
+    .map-hud__label.is-over { color: #ff4040; animation: cam-blink 0.8s step-end infinite; }
+    .map-hud__doors { font-size: 10px; color: #bdbdbd; }
+    .hud-doors { font-size: 11px; color: #cfcfcf; }
     .cam-btn {
       position: absolute;
       z-index: 2;
@@ -259,7 +406,7 @@
     .cam-btn::after { content: ""; position: absolute; inset: -5px; }   /* увеличенная зона нажатия */
     .cam-btn:active, .cam-btn--active { background: #1f6f1f; border-color: #8dff8d; color: #fff; }
     .cam-caption {
-      position: absolute; z-index: 2; left: 18px; bottom: 12px; right: 18px;
+      position: absolute; z-index: 2; left: 18px; bottom: 12px; right: 220px;
       font-size: 14px; font-weight: 700; letter-spacing: 0.04em;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }

@@ -18,7 +18,10 @@ const DEFAULTS = {
   toiletStaySec: [15, 25], breakChance: 0.05, breakSec: [20, 30],
   lure: { callSec: 8, cooldownSec: 25, reactSec: [1, 2], stepSec: [2.2, 3.2], maxStepsGood: 6, maxStepsMid: 3,
     lingerGoodSec: 12, lingerMidSec: 6 },
-  attack: { dwellSec: 10, warningToJumpscareSec: [3, 5] },
+  // doorSec: сколько он стоит в проёме двери кабинета; leftChance: шанс напасть через левую дверь (из s_hall1);
+  // blockedSec: сколько дверь должна быть закрыта подряд, чтобы он ушёл раньше.
+  attack: { dwellSec: 10, warningToJumpscareSec: [3, 5], doorSec: [7, 10], leftChance: 0.4, blockedSec: 4.5,
+    bangSec: [1.4, 2.4] },
   slaGood: 60, slaBad: 40, whistleChancePer10s: 0.1,
   doorKnockSec: [1.8, 2.6],   // пауза между стуком и входом с южного этажа в зал
 };
@@ -27,6 +30,10 @@ const KNOCK_BEFORE_SEC = 6;          // стук в стеклянную две�
 const TICKET_AGED_SEC = 30;          // тикет старше этого повышает активность врага
 const BREAK_FROM = new Set(['n_floor', 'front', 'n_hall']);   // откуда он может уйти на перерыв
 const LAUGH_REARM_SLA = 50;          // смех снова только после того, как рейтинг поднимется выше этого
+// Кабинет игрока: из s_hall1 он подходит к левой двери, из s_hall3 к правой. Закрытая дверь его останавливает.
+const ATTACK_FROM = { s_hall1: 'left', s_hall3: 'right' };
+const RETREAT_TO = { left: 'n_hall', right: 's_floor' };   // куда уходит, упёршись в закрытую дверь
+const DOOR_PAN = { left: -0.85, right: 0.85 };
 
 export function create(cfg, ctx) {
   const { state, graph, audio, emit, rng } = ctx;
@@ -59,12 +66,17 @@ export function create(cfg, ctx) {
   let pauseMul = 1;         // 0,9 после звонка при плохом рейтинге, действует на следующую паузу
   let whistleAcc = 0;
   let laughArmed = true;
+  let side = null;          // 'left' | 'right': к какой двери кабинета он идёт или у какой стоит
+  let blockedT = 0;         // сколько секунд подряд дверь перед ним закрыта
+  let bangT = 0;            // до следующего удара в закрытую дверь
 
   // ---------- вспомогательное ----------
-  function setStatus(status, dwell = false) {
+  function setStatus(status, dwell = false, door = null) {
     enemy.status = status;
-    emit('enemy:status', { id, status, dwell });
+    emit('enemy:status', { id, status, dwell, door });
   }
+
+  const doorClosed = () => !!(side && state.doors?.[side]);
 
   function moveTo(to) {
     const from = enemy.pos;
@@ -136,14 +148,40 @@ export function create(cfg, ctx) {
     mode = 'dwell';
     timer = C.attack.dwellSec;
     goFloor = false;
-    setStatus('idle', true);   // виден на камере 8 (и 7): последний шанс отогнать приманкой
+    side = ATTACK_FROM[enemy.pos] || 'right';
+    setStatus('idle', true);   // виден на камерах зала: последний шанс отогнать приманкой или приготовить дверь
+  }
+
+  // Подошёл к двери кабинета: стоит в проёме (видно, если посмотреть в ту сторону и включить свет).
+  function enterDoor() {
+    mode = 'door';
+    timer = range(C.attack.doorSec);
+    blockedT = 0;
+    bangT = range(C.attack.bangSec);
+    moveTo('desk');            // для камер он пропадает: стоит у двери, не в зале
+    setStatus('door', false, side);
+    audio.play?.('step', { pan: DOOR_PAN[side], volume: 1.2 });
+  }
+
+  // Дверь была закрыта: бьёт в неё и уходит.
+  function retreatFromDoor() {
+    audio.play?.('door_slam', { pan: DOOR_PAN[side], volume: 1.1 });
+    const back = RETREAT_TO[side] || 's_floor';
+    side = null;
+    returning = false;
+    goFloor = false;
+    trail = [back];
+    moveTo(back);
+    play('step', back);
+    startPause(5);
   }
 
   function enterWarning() {
     mode = 'warning';
     timer = range(C.attack.warningToJumpscareSec);
-    moveTo('desk');            // за спиной игрока; для камер он пропадает (статус warning)
-    setStatus('warning');
+    moveTo('desk');            // уже в кабинете, за спиной игрока; для камер он пропадает (статус warning)
+    setStatus('warning', false, side);
+    if (side) audio.play?.('door_open', { pan: DOOR_PAN[side] });
     play('warning_attack', 'desk');
   }
 
@@ -205,6 +243,7 @@ export function create(cfg, ctx) {
     const pos = enemy.pos;
     if (!returning && BREAK_FROM.has(pos) && rng() < C.breakChance) { enterBreak(); return; }
     if (pos === 's_hall3' && !returning && !goFloor) { enterDwell(); return; }
+    if (side && pos === 's_hall1') side = null;
     const to = pickNext(pos);
     if (!to) { endDash(); return; }
     if (needsKnock(pos, to)) { stepTimer = knockAtDoor(); return; }   // стук, потом вход на следующем шаге
@@ -220,6 +259,8 @@ export function create(cfg, ctx) {
 
   function arrive(pos) {
     if (pos === 's_toilet') { enterToilet(); return; }
+    // s_hall1: с шансом leftChance он сворачивает к левой двери кабинета.
+    if (pos === 's_hall1' && !returning && rng() < C.attack.leftChance) { enterDwell(); return; }
     // s_hall3 это последний шанс: 75% атака, 25% идёт дальше в туалет. Транзитом (из туалета) атаки нет.
     if (pos === 's_hall3' && !returning) {
       if (rng() < 0.25) goFloor = true;
@@ -260,7 +301,8 @@ export function create(cfg, ctx) {
   }
 
   function onLure(payload) {
-    if (mode === 'absent' || mode === 'toilet' || mode === 'break' || mode === 'warning' || mode === 'dead') return;
+    if (mode === 'absent' || mode === 'toilet' || mode === 'break' || mode === 'door' || mode === 'warning'
+      || mode === 'dead') return;
     const at = payload?.at;
     if (!at) return;
     const sla = state.sla;
@@ -275,6 +317,7 @@ export function create(cfg, ctx) {
 
     returning = false;
     goFloor = false;
+    side = null;
     lure = {
       path: path.slice(0, good ? C.lure.maxStepsGood : C.lure.maxStepsMid),
       stage: 'react',
@@ -308,6 +351,7 @@ export function create(cfg, ctx) {
   // ---------- публичное ----------
   function forceMove(posId) {
     lure = null;
+    side = null;
     doorKnocked = false;
     returning = false;
     goFloor = false;
@@ -333,6 +377,7 @@ export function create(cfg, ctx) {
       case 'move': if (payload.pos) forceMove(payload.pos); break;
       case 'dashNow': if (mode === 'pause') startDash(); break;
       case 'attackNow': forceMove('s_hall3'); break;
+      case 'attackLeft': forceMove('s_hall1'); enterDwell(); break;
       default: break;
     }
   }
@@ -376,7 +421,25 @@ export function create(cfg, ctx) {
       case 'lured': updateLured(dt); break;
       case 'dwell':
         timer -= dt;
-        if (timer <= 0) enterWarning();
+        if (timer <= 0) enterDoor();
+        break;
+      case 'door':
+        timer -= dt;
+        if (doorClosed()) {
+          blockedT += dt;
+          bangT -= dt;
+          if (bangT <= 0) {                 // стучит в закрытую дверь: игрок слышит, с какой он стороны
+            bangT = range(C.attack.bangSec);
+            audio.play?.('glass_knock', { pan: DOOR_PAN[side], volume: 0.9 });
+          }
+          if (blockedT >= C.attack.blockedSec) { retreatFromDoor(); break; }
+        } else {
+          blockedT = 0;
+        }
+        if (timer <= 0) {
+          if (doorClosed()) retreatFromDoor();
+          else enterWarning();
+        }
         break;
       case 'warning':
         timer -= dt;

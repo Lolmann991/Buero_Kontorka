@@ -96,8 +96,8 @@ function decodeAll() {
 
 const stopped = new WeakSet();
 
-// play(soundId, { at, loop, volume }) -> handle { stop() } | null.
-// at: позиция графа; без at звук играет «в голове» игрока.
+// play(soundId, { at, loop, volume, pan }) -> handle { stop() } | null.
+// at: позиция графа; без at звук играет «в голове» игрока. pan (-1..1): сторона в кабинете, если at не задан.
 export function play(soundId, opts = {}) {
   // Скример: свой MP3 из каталога; синтез только как запасной вариант, если файл не загрузился.
   if (soundId === 'jumpscare' && !buffers.jumpscare) {
@@ -130,7 +130,7 @@ export function play(soundId, opts = {}) {
 }
 
 function startHandle(handle, buf) {
-  const { at, loop, volume } = handle._opts;
+  const { at, loop, volume, pan } = handle._opts;
   const def = handle._def;
   const src = ctx.createBufferSource();
   src.buffer = buf;
@@ -167,6 +167,12 @@ function startHandle(handle, buf) {
       node.connect(pan);
       node = pan;
     }
+  } else if (typeof pan === 'number' && ctx.createStereoPanner) {
+    // Звук в кабинете с явной стороной (двери слева и справа): только панорама, без затухания по расстоянию.
+    const p = ctx.createStereoPanner();
+    p.pan.value = Math.max(-1, Math.min(1, pan));
+    node.connect(p);
+    node = p;
   }
   const g = ctx.createGain();
   g.gain.value = gainVal;

@@ -136,6 +136,298 @@ export function clockFace(timeSec, glitch = false) {
   return { chars: [s[0], s[1], 'A', 'M'], colon: false };
 }
 
+// ---------- кабинет: стены с дверями, взгляд по сторонам, приближение к монитору камер ----------
+// Сцена шире кадра: слева и справа от фото стола стоят стены с дверями (по SIDE_FRAC ширины кадра).
+// Взгляд (state.view) двигает всю комнату: translate для поворота головы, scale для приближения к монитору камер.
+// Рисуется здесь, решения (двери, свет, нагрузка) принимает main.js по намерениям intent:view / intent:door / intent:light.
+const SIDE_FRAC = 0.7;                       // ширина стены в долях кадра (совпадает с CSS .side)
+const SIDE_W = Math.round(PHOTO_W * SIDE_FRAC);   // 1170: координаты стены в тех же px, что и фото
+const SIDE_H = 941;
+const DOOR = { x: 300, y: 112, w: 460, h: 690 };  // проём двери на левой стене; правая стена зеркальная
+const PLATE = { x: 830, y: 360, w: 180, h: 280 }; // панель с кнопками «Дверь» и «Свет»
+const ENEMY_DOOR_IMG = 'assets/img/enemies/mr404/near.webp';
+const ENEMY_DOOR = { h: 610, aspect: 270 / 720, foot: 800 };
+const ZOOM = { fitH: 0.88, fitW: 0.95, cy: 0.455 };   // приближение к левому монитору: доля кадра и центр по высоте
+
+// Приближение к монитору камер: точка опоры, сдвиг и масштаб в CSS-переменных сцены.
+function zoomVars() {
+  const q = MONITOR_QUADS.left;
+  const xs = q.map((p) => p[0]);
+  const ys = q.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const cx = (x0 + x1) / 2 / PHOTO_W;
+  const cy = (y0 + y1) / 2 / SIDE_H;
+  const s = Math.min(ZOOM.fitW * PHOTO_W / (x1 - x0), ZOOM.fitH * SIDE_H / (y1 - y0));
+  return {
+    '--zoom-ox': `${(cx * 100).toFixed(2)}%`,
+    '--zoom-oy': `${(cy * 100).toFixed(2)}%`,
+    '--zoom-tx': `${((0.5 - cx) * 100).toFixed(2)}%`,
+    '--zoom-ty': `${((ZOOM.cy - cy) * 100).toFixed(2)}%`,
+    '--zoom-s': s.toFixed(3),
+    '--side-frac': `${SIDE_FRAC * 100}%`,
+  };
+}
+
+function buildSide(parent, side, ctx) {
+  const { t, emit } = ctx;
+  const flip = side === 'right';
+  const X = (x, w = 0) => (flip ? SIDE_W - x - w : x);              // зеркалим координаты, а не картинку (тексты не переворачиваются)
+  const P = (pts) => pts.map(([x, y]) => `${X(x)},${y}`).join(' ');
+  const wrap = el('div', `side side--${side}`, parent);
+  const s = svgEl('svg', { class: 'side-svg', viewBox: `0 0 ${SIDE_W} ${SIDE_H}`, preserveAspectRatio: 'none' }, wrap);
+  const id = (n) => `${side}-${n}`;
+
+  const defs = svgEl('defs', {}, s);
+  const lin = (name, x2, y2, stops) => {
+    const g = svgEl('linearGradient', { id: id(name), x1: 0, y1: 0, x2, y2 }, defs);
+    for (const [o, c] of stops) svgEl('stop', { offset: o, 'stop-color': c }, g);
+  };
+  // стена светлее к столу: на неё падает свет мониторов
+  lin('wall', flip ? 0 : 1, 0, [[0, '#06080a'], [0.55, '#0b0f10'], [1, '#141b1a']]);
+  if (flip) defs.lastChild.setAttribute('x1', 1);
+  lin('floor', 0, 1, [[0, '#120f0d'], [1, '#050404']]);
+  lin('metal', 0, 1, [[0, '#3b4144'], [0.5, '#262a2c'], [1, '#181b1d']]);
+  lin('frame', flip ? 0 : 1, 0, [[0, '#15191a'], [1, '#2c3335']]);
+  if (flip) defs.lastChild.setAttribute('x1', 1);
+  lin('seam', flip ? 0 : 1, 0, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.9)']]);
+  if (flip) defs.lastChild.setAttribute('x1', 1);
+  const cone = svgEl('radialGradient', { id: id('cone'), cx: 0.5, cy: 0.05, r: 0.95 }, defs);
+  svgEl('stop', { offset: 0, 'stop-color': 'rgba(230,255,235,0.75)' }, cone);
+  svgEl('stop', { offset: 0.45, 'stop-color': 'rgba(170,220,190,0.22)' }, cone);
+  svgEl('stop', { offset: 1, 'stop-color': 'rgba(120,180,150,0)' }, cone);
+  // враг в проёме: темнее и с зеленоватым оттенком, как всё в кабинете
+  const ef = svgEl('filter', { id: id('enemy'), 'color-interpolation-filters': 'sRGB' }, defs);
+  svgEl('feColorMatrix', { type: 'matrix',
+    values: '0.5 0.08 0 0 0  0.04 0.6 0.04 0 0  0 0.08 0.48 0 0  0 0 0 1 0' }, ef);
+  const hz = svgEl('pattern', { id: id('hazard'), width: 40, height: 40, patternUnits: 'userSpaceOnUse',
+    patternTransform: 'rotate(45)' }, defs);
+  svgEl('rect', { width: 40, height: 40, fill: '#151515' }, hz);
+  svgEl('rect', { width: 20, height: 40, fill: '#b8920e' }, hz);
+  const clip = svgEl('clipPath', { id: id('clip') }, defs);
+  svgEl('rect', { x: X(DOOR.x, DOOR.w), y: DOOR.y, width: DOOR.w, height: DOOR.h }, clip);
+
+  // стена, плинтус, пол
+  svgEl('rect', { x: 0, y: 0, width: SIDE_W, height: SIDE_H, fill: `url(#${id('wall')})` }, s);
+  svgEl('rect', { x: 0, y: 815, width: SIDE_W, height: SIDE_H - 815, fill: `url(#${id('floor')})` }, s);
+  svgEl('rect', { x: 0, y: 800, width: SIDE_W, height: 15, fill: '#0c0d0d' }, s);
+  // доска объявлений на стене (просто тёмные листки)
+  const board = svgEl('g', { opacity: 0.5 }, s);
+  svgEl('rect', { x: X(70, 170), y: 250, width: 170, height: 220, fill: '#14110d', stroke: '#1f1b16', 'stroke-width': 6 }, board);
+  for (const [x, y, w, h] of [[88, 268, 70, 90], [168, 276, 56, 70], [92, 372, 120, 80]]) {
+    svgEl('rect', { x: X(x, w), y, width: w, height: h, fill: '#2a2823' }, board);
+  }
+
+  // коридор за дверью: перспектива, свет лампы, враг; всё обрезано проёмом
+  const D = DOOR;
+  const hall = svgEl('g', { 'clip-path': `url(#${id('clip')})` }, s);
+  const bx0 = D.x + D.w * 0.37, bx1 = D.x + D.w * 0.63, by0 = D.y + D.h * 0.32, by1 = D.y + D.h * 0.6;
+  svgEl('rect', { x: X(D.x, D.w), y: D.y, width: D.w, height: D.h, fill: '#1a1f1d' }, hall);
+  svgEl('polygon', { points: P([[D.x, D.y], [D.x + D.w, D.y], [bx1, by0], [bx0, by0]]), fill: '#1c2220' }, hall);   // потолок
+  svgEl('polygon', { points: P([[D.x, D.y], [bx0, by0], [bx0, by1], [D.x, D.y + D.h]]), fill: '#28302d' }, hall); // стена
+  svgEl('polygon', { points: P([[D.x + D.w, D.y], [bx1, by0], [bx1, by1], [D.x + D.w, D.y + D.h]]), fill: '#232a27' }, hall);
+  svgEl('polygon', { points: P([[D.x, D.y + D.h], [D.x + D.w, D.y + D.h], [bx1, by1], [bx0, by1]]), fill: '#2d302b' }, hall); // пол
+  svgEl('rect', { x: X(bx0, bx1 - bx0), y: by0, width: bx1 - bx0, height: by1 - by0, fill: '#0b0d0c' }, hall);    // конец коридора
+  for (const k of [0.25, 0.5, 0.75]) {                                // швы плитки сходятся к дальней стене
+    const fx = D.x + D.w * k, tx = bx0 + (bx1 - bx0) * k;
+    svgEl('line', { x1: X(fx), y1: D.y + D.h, x2: X(tx), y2: by1, stroke: '#1d201c', 'stroke-width': 3 }, hall);
+  }
+  for (const k of [0.3, 0.6]) {
+    const y = by1 + (D.y + D.h - by1) * k;
+    const sx = D.x + (bx0 - D.x) * (1 - k), ex = D.x + D.w - (D.x + D.w - bx1) * (1 - k);
+    svgEl('line', { x1: X(sx), y1: y, x2: X(ex), y2: y, stroke: '#1d201c', 'stroke-width': 2 }, hall);
+  }
+  svgEl('rect', { x: X(bx0 + 18, bx1 - bx0 - 36), y: by0 + 14, width: bx1 - bx0 - 36, height: 6, fill: '#c8d8cc' }, hall); // лампа
+  svgEl('polygon', { class: 'hall-cone', fill: `url(#${id('cone')})`,
+    points: P([[bx0 + 10, by0 + 18], [bx1 - 10, by0 + 18], [D.x + D.w + 40, D.y + D.h], [D.x - 40, D.y + D.h]]) }, hall);
+  const ew = ENEMY_DOOR.h * ENEMY_DOOR.aspect;
+  const enemy = svgEl('image', { class: 'door-enemy', href: ENEMY_DOOR_IMG, x: X(D.x + D.w / 2 - ew / 2, ew),
+    y: ENEMY_DOOR.foot - ENEMY_DOOR.h, width: ew, height: ENEMY_DOOR.h, preserveAspectRatio: 'xMidYMax meet',
+    filter: `url(#${id('enemy')})` }, hall);
+  enemy.setAttributeNS('http://www.w3.org/1999/xlink', 'href', ENEMY_DOOR_IMG);
+  svgEl('rect', { class: 'hall-dark', x: X(D.x, D.w), y: D.y, width: D.w, height: D.h, fill: '#000' }, hall);
+
+  // рольставня: в открытом положении спрятана над проёмом (обрезана), закрываясь падает вниз
+  const shutter = svgEl('g', { class: 'door-shutter' }, svgEl('g', { 'clip-path': `url(#${id('clip')})` }, s));
+  svgEl('rect', { x: X(D.x, D.w), y: D.y, width: D.w, height: D.h, fill: `url(#${id('metal')})` }, shutter);
+  for (let y = D.y + 34; y < D.y + D.h - 40; y += 38) {
+    svgEl('rect', { x: X(D.x, D.w), y, width: D.w, height: 4, fill: '#0f1112' }, shutter);
+    svgEl('rect', { x: X(D.x, D.w), y: y + 4, width: D.w, height: 2, fill: '#4a5154' }, shutter);
+  }
+  svgEl('rect', { x: X(D.x, D.w), y: D.y + D.h - 40, width: D.w, height: 40, fill: `url(#${id('hazard')})` }, shutter);
+  svgEl('rect', { x: X(D.x + D.w / 2 - 50, 100), y: D.y + D.h - 80, width: 100, height: 18, rx: 4, fill: '#0e1011' }, shutter);
+
+  // коробка двери и надпись «выход» над ней
+  svgEl('rect', { x: X(D.x - 16, D.w + 32), y: D.y - 16, width: D.w + 32, height: D.h + 16, fill: 'none',
+    stroke: `url(#${id('frame')})`, 'stroke-width': 30 }, s);
+  svgEl('rect', { x: X(D.x - 4, D.w + 8), y: D.y - 4, width: D.w + 8, height: 8, fill: '#0b0c0c' }, s);
+  const sign = svgEl('g', { class: 'exit-sign' }, s);
+  svgEl('rect', { x: X(D.x + D.w / 2 - 95, 190), y: 38, width: 190, height: 48, rx: 4, fill: '#062a14', stroke: '#1d7a3d',
+    'stroke-width': 3 }, sign);
+  const txt = svgEl('text', { x: X(D.x + D.w / 2), y: 70, 'text-anchor': 'middle', fill: '#5dff98',
+    'font-size': 26, 'font-weight': 700, 'font-family': 'ui-monospace, Menlo, Consolas, monospace', 'letter-spacing': 2 }, sign);
+  txt.textContent = t('office.exit');
+
+  // темнота у стыка с фото стола: шов уходит в тень
+  svgEl('rect', { x: flip ? 0 : SIDE_W - 160, y: 0, width: 160, height: SIDE_H, fill: `url(#${id('seam')})` }, s);
+
+  // панель с кнопками (HTML поверх SVG, в процентах стены)
+  const plate = el('div', 'door-plate', wrap);
+  plate.style.left = `${(X(PLATE.x, PLATE.w) / SIDE_W) * 100}%`;
+  plate.style.top = `${(PLATE.y / SIDE_H) * 100}%`;
+  plate.style.width = `${(PLATE.w / SIDE_W) * 100}%`;
+  plate.style.height = `${(PLATE.h / SIDE_H) * 100}%`;
+  const mkBtn = (cls, label, intent) => {
+    const b = el('button', `door-btn ${cls}`, plate);
+    b.type = 'button';
+    el('i', '', b);
+    const span = el('span', '', b);
+    span.textContent = label;
+    b.addEventListener('pointerup', (e) => { if (e.button <= 0) emit(intent, { side }); });
+    return b;
+  };
+  const doorBtn = mkBtn('door-btn--door', t('office.door'), 'intent:door');
+  const lightBtn = mkBtn('door-btn--light', t('office.light'), 'intent:light');
+  doorBtn.setAttribute('aria-label', t(`office.door.${side}`));
+  lightBtn.setAttribute('aria-label', t(`office.light.${side}`));
+
+  return { wrap, doorBtn, lightBtn, enemy: false, closed: null, lit: null };
+}
+
+// Плашка токенов и нагрузки поверх кабинета (в кадре камеры и на карте свои).
+const HUD_SEGMENTS = 5;
+function buildOfficeHud(parent, t) {
+  const hud = el('div', 'office-hud', parent);
+  const row = el('div', 'oh-row', hud);
+  el('span', 'oh-label', row).textContent = t('office.power');
+  const num = el('b', 'oh-num', row);
+  const fill = el('i', '', el('div', 'oh-bar', hud));
+  const row2 = el('div', 'oh-row', hud);
+  const loadLabel = el('span', 'oh-label', row2);
+  loadLabel.textContent = t('office.usage');
+  const bar = el('span', 'hud-load__bar', row2);
+  const segs = [];
+  for (let i = 0; i < HUD_SEGMENTS; i++) segs.push(el('i', i < 2 ? 'lv-g' : i < 4 ? 'lv-y' : 'lv-r', bar));
+  const doors = el('div', 'oh-doors', hud);
+  return { hud, num, fill, segs, doors, loadLabel, last: {} };
+}
+
+function syncOffice(state, t) {
+  const st = els.stage;
+  if (!st) return;
+  const view = state.running ? state.view : 'desk';
+  if (st.dataset.view !== view) st.dataset.view = view;
+  st.classList.toggle('is-running', !!state.running);
+  st.classList.toggle('is-nopower', state.running && state.tokens <= 0);
+  const alarm = state.running && Object.values(state.enemies).some((e) => e?.status === 'warning');
+  st.classList.toggle('is-warning', alarm);
+  for (const side of ['left', 'right']) {
+    const sd = els.sides[side];
+    const closed = !!state.doors[side];
+    const lit = !!state.lights[side];
+    const enemy = state.running && Object.values(state.enemies).some((e) => e?.status === 'door' && e.door === side);
+    if (sd.closed !== closed) {
+      sd.closed = closed;
+      sd.wrap.classList.toggle('is-closed', closed);
+      sd.doorBtn.classList.toggle('is-on', closed);
+      sd.doorBtn.setAttribute('aria-pressed', String(closed));
+    }
+    if (sd.lit !== lit) {
+      sd.lit = lit;
+      sd.wrap.classList.toggle('is-lit', lit);
+      sd.lightBtn.classList.toggle('is-on', lit);
+      sd.lightBtn.setAttribute('aria-pressed', String(lit));
+    }
+    if (sd.enemy !== enemy) {
+      sd.enemy = enemy;
+      sd.wrap.classList.toggle('has-enemy', enemy);
+    }
+  }
+  // плашка токенов
+  const h = els.hud;
+  const v = Math.max(0, Math.ceil(state.tokens));
+  if (h.last.v !== v) {
+    h.last.v = v;
+    h.num.textContent = `${v}%`;
+    h.fill.style.width = `${v}%`;
+    h.fill.className = v <= 15 ? 'is-bad' : v <= 35 ? 'is-mid' : '';
+  }
+  const lit = Math.min(HUD_SEGMENTS, Math.max(0, Math.round(state.load)));
+  if (h.last.lit !== lit) {
+    h.last.lit = lit;
+    h.segs.forEach((seg, i) => seg.classList.toggle('is-lit', i < lit));
+    const over = state.load >= 5;
+    h.loadLabel.textContent = t(over ? 'cams.hud.overload' : 'office.usage');
+    h.loadLabel.classList.toggle('is-over', over);
+  }
+  const word = (s) => t(state.doors[s] ? 'cams.map.doorClosed' : 'cams.map.doorOpen');
+  const dt = t('cams.map.doors', { l: word('left'), r: word('right') });
+  if (h.last.doors !== dt) { h.last.doors = dt; h.doors.textContent = dt; }
+}
+
+// Кнопки взгляда: стрелки по краям, «Камеры» внизу, «Назад» в режиме камер.
+function buildNav(stage, ctx) {
+  const { t, emit, state } = ctx;
+  const mk = (cls, text, label, fn) => {
+    const b = el('button', `nav-btn ${cls}`, stage);
+    b.type = 'button';
+    b.textContent = text;
+    b.setAttribute('aria-label', label);
+    b.addEventListener('pointerup', (e) => { if (e.button <= 0) fn(); });
+    return b;
+  };
+  mk('nav-btn--left', '◀', t('office.lookLeft'), () => emit('intent:view', { view: state.view === 'right' ? 'desk' : 'left' }));
+  mk('nav-btn--right', '▶', t('office.lookRight'), () => emit('intent:view', { view: state.view === 'left' ? 'desk' : 'right' }));
+  mk('nav-btn--cams', t('office.cams'), t('office.cams'), () => emit('intent:view', { view: 'cams' }));
+  mk('nav-btn--back', t('office.back'), t('office.back'), () => emit('intent:view', { view: 'desk' }));
+}
+
+// Клавиатура: A/D или стрелки — повернуться, W/K/↑ — к камерам, S/↓/Esc — назад, Пробел — камеры туда-обратно,
+// T — дверь, L — свет (у той двери, на которую смотришь).
+function onKey(e, ctx) {
+  const { state, emit } = ctx;
+  if (!state.running || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target?.closest?.('input, textarea, select, .dbg-panel')) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const v = state.view;
+  const side = v === 'left' || v === 'right' ? v : null;
+  let handled = true;
+  switch (k) {
+    case 'a': case 'ArrowLeft':
+      if (v === 'right') emit('intent:view', { view: 'desk' });
+      else if (v === 'desk') emit('intent:view', { view: 'left' });
+      break;
+    case 'd': case 'ArrowRight':
+      if (v === 'left') emit('intent:view', { view: 'desk' });
+      else if (v === 'desk') emit('intent:view', { view: 'right' });
+      break;
+    case 'w': case 'k': case 'ArrowUp': emit('intent:view', { view: 'cams' }); break;
+    case 's': case 'ArrowDown': case 'Escape': emit('intent:view', { view: 'desk' }); break;
+    case ' ': emit('intent:view', { view: v === 'cams' ? 'desk' : 'cams' }); break;
+    case 't': if (side) emit('intent:door', { side }); else handled = false; break;
+    case 'l': if (side) emit('intent:light', { side }); else handled = false; break;
+    default: handled = false;
+  }
+  if (handled) e.preventDefault();
+}
+
+// Свайп по сцене (мимо мониторов и кнопок): палец вправо — взгляд налево, и наоборот.
+function bindSwipe(stage, ctx) {
+  const { state, emit } = ctx;
+  let start = null;
+  stage.addEventListener('pointerdown', (e) => {
+    start = e.target.closest?.('.mon, button') ? null : { x: e.clientX, y: e.clientY };
+  });
+  stage.addEventListener('pointerup', (e) => {
+    if (!start || !state.running) return;
+    const dx = e.clientX - start.x, dy = e.clientY - start.y;
+    start = null;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const v = state.view;
+    if (dx > 0) emit('intent:view', { view: v === 'right' ? 'desk' : v === 'desk' ? 'left' : v });
+    else emit('intent:view', { view: v === 'left' ? 'desk' : v === 'desk' ? 'right' : v });
+  });
+}
+
 // ---------- модуль ----------
 let root = null;
 let offs = [];
@@ -175,15 +467,17 @@ function updateTension(state) {
 // Слои атмосферы. Всё в процентах сцены, поверх фото ничего не запекается.
 function buildFxBelow(stage) {
   el('div', 'fx fx-grade', stage);
+  el('div', 'fx fx-edge fx-edge--l', stage);              // края фото уходят в тень: там стык со стенами
   const win = el('div', 'fx fx-window', stage);          // свет с улицы сквозь жалюзи
   els.fxWindow = win;
   el('div', 'fx-window__pass', win);                      // тень «проходит» за окном
   els.fxSpill = el('div', 'fx fx-spill', stage);          // свет мониторов на клавиатуре
+  el('div', 'fx fx-edge fx-edge--r', stage);
   el('div', 'fx fx-vignette', stage);
 }
 
-function buildFxAbove(stage) {
-  el('div', 'fx fx-led', stage);                          // индикатор веб-камеры сам горит красным
+function buildFxAbove(scene, stage) {
+  el('div', 'fx fx-led', scene);                          // индикатор веб-камеры сам горит красным
   el('div', 'fx fx-grain', stage);
 }
 
@@ -554,19 +848,41 @@ export function mount(rootEl, ctx) {
   backdrop.alt = '';
   backdrop.draggable = false;
 
-  // Сцена
+  // Сцена: кадр 16:9 (stage), внутри комната (room) = фото стола (scene) и стены с дверями по бокам (side)
   els.stage = el('div', 'stage', root);
-  const img = el('img', 'desk-photo', els.stage);
+  els.stage.dataset.view = 'desk';
+  for (const [k, v] of Object.entries(zoomVars())) els.stage.style.setProperty(k, v);
+  els.room = el('div', 'room', els.stage);
+  els.sides = {};
+  els.sides.left = buildSide(els.room, 'left', ctx);
+  els.scene = el('div', 'scene', els.room);
+  els.sides.right = buildSide(els.room, 'right', ctx);
+  const img = el('img', 'desk-photo', els.scene);
   img.src = 'assets/img/desk/desk.webp';
   img.alt = '';
   img.draggable = false;
 
-  buildFxBelow(els.stage);
+  buildFxBelow(els.scene);
 
-  els.monLeft = el('div', 'mon', els.stage);
+  els.monLeft = el('div', 'mon', els.scene);
   els.monLeft.id = 'monitor-left';
-  els.monRight = el('div', 'mon', els.stage);
+  els.monRight = el('div', 'mon', els.scene);
   els.monRight.id = 'monitor-right';
+  // Нажатие на монитор камер со стола: приблизиться к нему (сами кнопки карты работают уже вблизи)
+  els.monHit = el('button', 'mon-hit', els.scene);
+  els.monHit.type = 'button';
+  els.monHit.setAttribute('aria-label', t('office.cams'));
+  el('span', 'mon-hit__label', els.monHit).textContent = t('office.zoomHint');
+  {
+    const q = MONITOR_QUADS.left;
+    const xs = q.map((p) => p[0]), ys = q.map((p) => p[1]);
+    const pct = (v, total) => `${((v / total) * 100).toFixed(2)}%`;
+    els.monHit.style.left = pct(Math.min(...xs), PHOTO_W);
+    els.monHit.style.top = pct(Math.min(...ys), SIDE_H);
+    els.monHit.style.width = pct(Math.max(...xs) - Math.min(...xs), PHOTO_W);
+    els.monHit.style.height = pct(Math.max(...ys) - Math.min(...ys), SIDE_H);
+  }
+  els.monHit.addEventListener('pointerup', (e) => { if (e.button <= 0) emit('intent:view', { view: 'cams' }); });
   els.sd = buildShutdown(t);
   layoutMonitors();
   if (typeof ResizeObserver !== 'undefined') {
@@ -576,12 +892,19 @@ export function mount(rootEl, ctx) {
     window.addEventListener('resize', layoutMonitors);
   }
 
-  const clock = buildClock(els.stage);
+  const clock = buildClock(els.scene);
   els.cells = clock.cells;
   els.colon = clock.colon;
   els.clockGlitch = 0;
-  buildFxAbove(els.stage);
+  buildFxAbove(els.scene, els.stage);
   renderClock(state);
+
+  els.hud = buildOfficeHud(els.stage, t);
+  buildNav(els.stage, ctx);
+  bindSwipe(els.stage, ctx);
+  els.keyHandler = (e) => onKey(e, ctx);
+  document.addEventListener('keydown', els.keyHandler);
+  syncOffice(state, t);
 
   // фонарь за окном: редко и неровно, к утру чаще
   els.flickWin = makeFlicker(els.fxWindow,
@@ -599,10 +922,12 @@ export function mount(rootEl, ctx) {
   els.startTitle = el('h1', 'start-title', els.start);
   els.startHint = el('p', 'start-hint', els.start);
   els.startHint.textContent = t('ui.headphones');
+  els.startKeys = el('p', 'start-hint start-hint--small', els.start);
+  els.startKeys.textContent = t('office.controls');
   els.startBtn = el('button', 'start-btn', els.start);
   els.startBtn.type = 'button';
   els.startBtn.textContent = t('ui.startShift');
-  els.startTitle.textContent = t('ui.title');
+  els.startTitle.textContent = t('ui.title');
 
   // Полный экран: на Android Chrome кнопка убирает панели браузера; на iPhone Safari API нет,
   // там показываем подсказку про запуск с главного экрана (manifest + мета-теги в index.html).
@@ -653,6 +978,7 @@ export function mount(rootEl, ctx) {
       else if (state.tokens > 0 && els.sd.t >= 0) resetShutdown();
       updateShutdown(dt);
       updateScare(dt, ctx);
+      syncOffice(state, t);
     }),
     on('jumpscare', ({ enemyId }) => startScare(enemyId)),
     on('glitch', ({ type }) => {
@@ -679,6 +1005,7 @@ export function mount(rootEl, ctx) {
 
 export function unmount() {
   els.resizeObserver?.disconnect();
+  if (els.keyHandler) document.removeEventListener('keydown', els.keyHandler);
   offs.forEach((off) => off());
   offs = [];
   if (root) root.replaceChildren();

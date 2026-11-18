@@ -21,6 +21,9 @@ function initial() {
     camera: null,       // номер открытой камеры или null
     call: { active: false, left: 0, cooldown: 0, at: null }, // звонок-приманка: идёт, осталось, перезарядка (сек), позиция графа, куда звонят
     repairing: false,   // удерживается кнопка починки
+    doors: { left: false, right: false },   // закрыта ли дверь кабинета слева / справа (каждая +1 к нагрузке)
+    lights: { left: false, right: false },  // горит ли свет в проёме двери (+1 к нагрузке)
+    view: 'desk',       // куда смотрит игрок: desk | left | right | cams (приближен к монитору камер)
     phone: { status: 'idle', kind: null, id: null, name: null, t: 0, sub: null }, // звонки в Teams (calls.js): status incoming | playing | ringing | noanswer | open
     flags: { demoDone: false, ending: null, unlocked: [] },
   };
@@ -119,6 +122,9 @@ export function newNight(n, cfg = {}) {
   _state.camera = null;
   _state.call = { active: false, left: 0, cooldown: 0 };
   _state.repairing = false;
+  _state.doors = { left: false, right: false };
+  _state.lights = { left: false, right: false };
+  _state.view = 'desk';
   _state.phone = { status: 'idle', kind: null, id: null, name: null, t: 0, sub: null };
   emit('night:start', { n });
 }
@@ -173,11 +179,14 @@ export function resetSave() {
 }
 
 // Нагрузка по правилам раздела 5: фон 1, камера +1, звонок-приманка +2, починка +1.
+// Кабинет: каждая закрытая дверь +1, каждый включённый свет в проёме +1.
 export function recalcLoad() {
   set('load', 1
     + (_state.camera !== null ? 1 : 0)
     + (_state.call.active ? 2 : 0)
-    + (_state.repairing ? 1 : 0));
+    + (_state.repairing ? 1 : 0)
+    + (_state.doors.left ? 1 : 0) + (_state.doors.right ? 1 : 0)
+    + (_state.lights.left ? 1 : 0) + (_state.lights.right ? 1 : 0));
 }
 
 // Списание токенов: нагрузка × 0,1% в секунду. Потраченное копится в аппетите ИИ.
