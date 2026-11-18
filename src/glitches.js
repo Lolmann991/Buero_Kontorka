@@ -35,11 +35,12 @@ export function create(ctx) {
   let quietUntil = 0;      // недавно было настоящее сообщение или тикет
 
   // ---- условия «игрок гарантированно заметит» ----
-  const enemyAlert = () => Object.values(S.enemies ?? {}).some((e) => e && (e.status === 'warning' || e.status === 'attack'));
+  const enemyAlert = () => Object.values(S.enemies ?? {}).some((e) => e && (e.status === 'warning' || e.status === 'attack' || e.status === 'door'));
 
   function canShow(kind) {
     const t = S.time;
     if (!S.running || !(S.tokens > 0)) return false;        // мониторы выключены
+    if (S.view && S.view !== 'desk') return false;         // игрок не смотрит на монитор Teams
     if (t < quietUntil) return false;                       // рядом настоящее сообщение
     if (repairing) return false;                            // игрок держит кнопку починки
     if (S.phone && S.phone.status !== 'idle') return false; // звонок и субтитры отвлекают

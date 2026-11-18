@@ -99,6 +99,24 @@ function buildMap(parent, ctx) {
   svg('rect', { class: 'you-box', x: view.you.x - 4, y: view.you.y - 4, width: 8, height: 8 }, canvas);
   const you = svg('text', { class: 'you-text', x: view.you.x, y: view.you.y - 9 }, canvas);
   you.textContent = T('cams.map.you');
+  // Двери кабинета по бокам от места игрока: красные, когда закрыты
+  els.mapDoors = {};
+  for (const [side, dx] of [['left', -13], ['right', 9]]) {
+    els.mapDoors[side] = svg('rect', { class: 'you-door', x: view.you.x + dx, y: view.you.y - 7, width: 4, height: 14 }, canvas);
+  }
+
+  // Токены, нагрузка и двери прямо на карте (раньше были видны только в кадре камеры)
+  const hud = el('div', 'map-hud', map);
+  const top = el('div', 'map-hud__row', hud);
+  el('span', 'map-hud__label', top).textContent = T('cams.map.tokens');
+  els.mapTokens = el('span', 'map-hud__num', top);
+  els.mapTokenFill = el('i', '', el('div', 'map-hud__bar', hud));
+  const row = el('div', 'map-hud__row', hud);
+  els.mapLoadLabel = el('span', 'map-hud__label', row);
+  const segs = el('span', 'hud-load__bar', row);
+  els.mapLoadSegs = [];
+  for (let i = 0; i < LOAD_SEGMENTS; i++) els.mapLoadSegs.push(el('i', i < 2 ? 'lv-g' : i < 4 ? 'lv-y' : 'lv-r', segs));
+  els.mapDoorText = el('div', 'map-hud__doors', hud);
 
   // Кнопки камер
   els.buttons = {};
@@ -169,6 +187,7 @@ function buildView(parent, ctx) {
   els.hudName = el('div', 'hud-name', hud);
   const stat = el('div', 'hud-stat', hud);
   els.hudTokens = el('div', '', stat);
+  els.hudDoors = el('div', 'hud-doors', stat);
   const load = el('div', 'hud-load', stat);
   els.hudLoadLabel = el('span', 'hud-load__label', load);
   const bar = el('span', 'hud-load__bar', load);
@@ -253,10 +272,35 @@ function setText(key, node, text) {
   node.textContent = text;
 }
 
+const doorWord = (side) => T(S.doors?.[side] ? 'cams.map.doorClosed' : 'cams.map.doorOpen');
+
+// Токены и нагрузка на карте: обновляются каждый кадр, пока карта на экране.
+function syncMapHud() {
+  if (!els.mapTokens) return;
+  const v = Math.max(0, Math.ceil(S.tokens));
+  setText('mapTokens', els.mapTokens, `${v}%`);
+  if (last.mapFill !== v) {
+    last.mapFill = v;
+    els.mapTokenFill.style.width = `${v}%`;
+    els.mapTokenFill.className = v <= 15 ? 'is-bad' : v <= 35 ? 'is-mid' : '';
+  }
+  const over = S.load >= LOAD_OVERLOAD;
+  setText('mapLoad', els.mapLoadLabel, over ? T('cams.hud.overload') : T('cams.hud.load'));
+  els.mapLoadLabel.classList.toggle('is-over', over);
+  const lit = Math.min(LOAD_SEGMENTS, Math.max(0, Math.round(S.load)));
+  if (last.mapLit !== lit) {
+    last.mapLit = lit;
+    els.mapLoadSegs.forEach((seg, i) => seg.classList.toggle('is-lit', i < lit));
+  }
+  setText('mapDoors', els.mapDoorText, T('cams.map.doors', { l: doorWord('left'), r: doorWord('right') }));
+  for (const side of ['left', 'right']) els.mapDoors[side].classList.toggle('is-closed', !!S.doors?.[side]);
+}
+
 function syncHud() {
   const hour = Math.min(6, Math.floor(S.time / 60));
   setText('time', els.hudTime, T('cams.hud.time', { h: hour === 0 ? 12 : hour }));
   setText('tokens', els.hudTokens, T('cams.hud.tokens', { v: Math.ceil(S.tokens) }));
+  setText('doors', els.hudDoors, T('cams.map.doors', { l: doorWord('left'), r: doorWord('right') }));
   const over = S.load >= LOAD_OVERLOAD;
   setText('load', els.hudLoadLabel, over ? T('cams.hud.overload') : T('cams.hud.load'));
   els.hudLoadLabel.classList.toggle('is-over', over);
@@ -607,6 +651,7 @@ export function mount(rootEl, ctx) {
     }
   };
   refresh();
+  syncMapHud();
 
   // Подсветка позиции из отладочной панели
   const highlight = ({ pos, neighbors = [] } = {}) => {
@@ -621,7 +666,7 @@ export function mount(rootEl, ctx) {
   offs = [
     on('camera:open', refresh),
     on('camera:close', refresh),
-    on('night:start', refresh),
+    on('night:start', () => { last = {}; refresh(); syncMapHud(); }),
     on('debug:highlight', highlight),
     on('debug:flash', () => { if (shown !== null) flash(); }),
     on('debug:sprite', ({ pos, cam, x, y, scale, pose, light, edge }) => {
@@ -634,7 +679,7 @@ export function mount(rootEl, ctx) {
     }),
     // Поломка камеры и HUD читаются из state раз в кадр; своих игровых таймеров нет.
     on('tick', () => {
-      if (shown === null) return;
+      if (shown === null) { syncMapHud(); return; }
       syncHud();
       renderSprites();
       renderRepair();

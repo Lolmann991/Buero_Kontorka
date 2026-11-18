@@ -78,6 +78,16 @@
           "warningToJumpscareSec": [
             3,
             5
+          ],
+          "doorSec": [
+            7,
+            10
+          ],
+          "leftChance": 0.4,
+          "blockedSec": 4.5,
+          "bangSec": [
+            1.4,
+            2.4
           ]
         },
         "slaGood": 60,

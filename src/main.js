@@ -80,22 +80,82 @@ on('intent:startShift', () => {
   set('running', true);
 });
 
+// ---------- кабинет: взгляд, двери, свет ----------
+// view: desk (стол, оба монитора) | left / right (дверь слева / справа) | cams (приближение к монитору камер).
+const VIEWS = ['desk', 'left', 'right', 'cams'];
+const SIDES = ['left', 'right'];
+const DOOR_PAN = { left: -0.8, right: 0.8 };
+
+function closeCameraNow() {
+  if (state.camera === null) return;
+  if (state.repairing) set('repairing', false);
+  set('camera', null);
+  recalcLoad();
+  emit('camera:close');
+}
+
+function setLight(side, lit) {
+  if (state.lights[side] === lit) return;
+  set(`lights.${side}`, lit);
+  recalcLoad();
+  emit('light:change', { side, on: lit });
+}
+
+function setView(view) {
+  const prev = state.view;
+  if (prev === view) return;
+  // Отвернулся от монитора камер: камера закрывается. Отвернулся от двери: свет гаснет (экономия токенов).
+  if (prev === 'cams') closeCameraNow();
+  if (SIDES.includes(prev)) setLight(prev, false);
+  set('view', view);
+  emit('view:change', { view, prev });
+}
+
+on('intent:view', ({ view } = {}) => {
+  if (!state.running || !VIEWS.includes(view)) return;
+  if (view === 'cams' && state.tokens <= 0) return;   // монитор без питания: приближаться не к чему
+  setView(view);
+});
+
+on('intent:door', ({ side, closed } = {}) => {
+  if (!state.running || !SIDES.includes(side)) return;
+  const want = closed ?? !state.doors[side];
+  if (want && state.tokens <= 0) return;              // без токенов двери не держатся
+  if (state.doors[side] === want) return;
+  set(`doors.${side}`, want);
+  recalcLoad();
+  audio.play(want ? 'door_slam' : 'door_open', { pan: DOOR_PAN[side], volume: want ? 0.7 : 0.55 });
+  emit('door:change', { side, closed: want });
+});
+
+on('intent:light', ({ side, on: lit } = {}) => {
+  if (!state.running || !SIDES.includes(side)) return;
+  const want = lit ?? !state.lights[side];
+  if (want && (state.tokens <= 0 || state.view !== side)) return;   // свет только у той двери, на которую смотришь
+  setLight(side, want);
+});
+
+// Конец смены и новая ночь: взгляд на стол, двери открыты, свет погашен.
+on('night:end', () => {
+  for (const side of SIDES) {
+    if (state.doors[side]) set(`doors.${side}`, false);
+    if (state.lights[side]) set(`lights.${side}`, false);
+  }
+  if (state.view !== 'desk') { set('view', 'desk'); emit('view:change', { view: 'desk' }); }
+  recalcLoad();
+});
+
 // Открытие камеры: состояние и событие; вид рисует ui/cameras.js.
 on('intent:openCamera', ({ id }) => {
   if (!state.running || state.tokens <= 0) return;
+  if (state.view !== 'cams') setView('cams');   // камеры смотрят только приблизившись к монитору
   if (state.repairing && state.camera !== id) set('repairing', false);   // кнопка починки осталась на прошлой камере
   set('camera', id);
   recalcLoad();
   emit('camera:open', { id });
 });
 
-on('intent:closeCamera', () => {
-  if (state.camera === null) return;
-  if (state.repairing) set('repairing', false);
-  set('camera', null);
-  recalcLoad();
-  emit('camera:close');
-});
+on('intent:closeCamera', closeCameraNow);
 
 // Конец смены закрывает камеру: на экране итога остаётся стол.
 on('night:end', () => {
@@ -168,6 +228,16 @@ on('tokens:change', ({ value }) => {
   }
   if (state.call.active) endCall();
   set('repairing', false);
+  // Питание кончилось: двери сами открываются, свет гаснет, монитор камер мёртв.
+  for (const side of SIDES) {
+    if (state.doors[side]) {
+      set(`doors.${side}`, false);
+      audio.play('door_open', { pan: DOOR_PAN[side], volume: 0.6 });
+      emit('door:change', { side, closed: false });
+    }
+    setLight(side, false);
+  }
+  if (state.view === 'cams') setView('desk');
   recalcLoad();
 });
 
@@ -201,7 +271,7 @@ on('enemy:moved', ({ id, to }) => {
   mirrorEnemy(id, { pos: to });
 });
 
-on('enemy:status', ({ id, status, dwell = false }) => mirrorEnemy(id, { status, dwell }));
+on('enemy:status', ({ id, status, dwell = false, door = null }) => mirrorEnemy(id, { status, dwell, door }));
 
 on('night:start', () => {
   enemies = [];
@@ -305,7 +375,10 @@ function syncAmbient() {
   if (state.night >= 4) list.push('amb_dark');
   audio.setAmbient(list);
 }
-on('enemy:status', ({ status }) => { warning = status === 'warning'; if (state.running) syncAmbient(); });
+on('enemy:status', ({ status }) => {
+  warning = status === 'warning' || status === 'door';
+  if (state.running) syncAmbient();
+});
 on('load:change', ({ overload }) => {
   overloaded = overload;
   if (state.running) syncAmbient();
