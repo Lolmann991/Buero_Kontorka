@@ -327,5 +327,10 @@
   "over.jab.5": "Typisch Azubi: Strom verschwendet, Tür vergessen.",
   "over.jab.6": "Deine Probezeit ist hiermit beendet.",
   "over.retry": "Nochmal",
-  "over.menu": "Menü"
+  "over.menu": "Menü",
+  "office.note.left": "TÜR KLEMMT!\nFEST DRÜCKEN",
+  "office.note.right": "LICHT AUS!\nSTROM IST\nTEUER!!",
+  "office.sticker": "NICHT ANLEHNEN",
+  "office.scratch.left": "HILFE",
+  "office.scratch.right": "IIII IIII I"
 }

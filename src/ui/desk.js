@@ -168,6 +168,67 @@ function zoomVars() {
   };
 }
 
+// ---------- износ: процедурные текстуры грязи, ржавчины и царапин ----------
+// Рисуются один раз на canvas (с зерном, чтобы левая и правая стены отличались) и кладутся поверх как картинки.
+function prng(seed) {
+  let x = seed >>> 0;
+  return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+}
+
+// o: blots (пятна), streaks (подтёки сверху вниз), scratches (царапины), speck (доля крапинок), цвета 'r,g,b'.
+function grimeTexture(w, h, seed, o = {}) {
+  const r = prng(seed);
+  const [c, g] = makeCanvas(w, h);
+  const blotRGB = o.blotRGB ?? '18,14,8';
+  for (let i = 0; i < (o.blots ?? 40); i++) {
+    const x = r() * w, y = r() * h, rad = (0.03 + r() * (o.blotSize ?? 0.12)) * Math.max(w, h);
+    const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+    gr.addColorStop(0, `rgba(${blotRGB},${((o.blotA ?? 0.2) * (0.4 + r() * 0.6)).toFixed(3)})`);
+    gr.addColorStop(1, `rgba(${blotRGB},0)`);
+    g.fillStyle = gr;
+    g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+  }
+  const streakRGB = o.streakRGB ?? '25,18,10';
+  for (let i = 0; i < (o.streaks ?? 25); i++) {
+    const x = r() * w, y0 = (o.streakTop ? 0 : r() * h * 0.6), len = (0.1 + r() * 0.5) * h, sw = 1 + r() * (o.streakW ?? 4);
+    const gr = g.createLinearGradient(0, y0, 0, y0 + len);
+    gr.addColorStop(0, `rgba(${streakRGB},${((o.streakA ?? 0.25) * (0.5 + r() * 0.5)).toFixed(3)})`);
+    gr.addColorStop(1, `rgba(${streakRGB},0)`);
+    g.fillStyle = gr;
+    g.fillRect(x, y0, sw, len);
+  }
+  g.lineCap = 'round';
+  for (let i = 0; i < (o.scratches ?? 30); i++) {
+    const x = r() * w, y = r() * h, a = (o.scratchAngle ?? r() * Math.PI) + (r() - 0.5) * 0.6, l = 6 + r() * (o.scratchLen ?? 60);
+    const dx = Math.cos(a) * l, dy = Math.sin(a) * l;
+    g.lineWidth = 0.6 + r() * 1.2;
+    g.strokeStyle = `rgba(0,0,0,${(0.25 + r() * 0.25).toFixed(2)})`;
+    g.beginPath(); g.moveTo(x + 1, y + 1); g.lineTo(x + dx + 1, y + dy + 1); g.stroke();
+    g.strokeStyle = `rgba(200,205,195,${(0.06 + r() * 0.1).toFixed(2)})`;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + dx, y + dy); g.stroke();
+  }
+  const sp = o.speck ?? 0.04;
+  if (sp > 0) {
+    const img = g.getImageData(0, 0, w, h);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (r() > sp) continue;
+      const light = r() < (o.lightSpeck ?? 0.15);
+      const a = light ? 10 + r() * 25 : 30 + r() * 70;                 // светлые крупинки еле заметны
+      d[i] = d[i + 1] = d[i + 2] = light ? 140 : 0;
+      d[i + 3] = Math.min(255, d[i + 3] + a);
+    }
+    g.putImageData(img, 0, 0);
+  }
+  return c.toDataURL('image/png');
+}
+
+let grimeTile = null;   // мелкая плитка износа для HTML-кнопок и плашек (повторяется)
+function grimeTileUrl() {
+  grimeTile ||= grimeTexture(160, 160, 77, { blots: 10, blotA: 0.25, blotSize: 0.3, streaks: 6, scratches: 14, scratchLen: 30, speck: 0.03, lightSpeck: 0.05 });
+  return grimeTile;
+}
+
 function buildSide(parent, side, ctx) {
   const { t, emit } = ctx;
   const flip = side === 'right';
@@ -206,16 +267,89 @@ function buildSide(parent, side, ctx) {
   const clip = svgEl('clipPath', { id: id('clip') }, defs);
   svgEl('rect', { x: X(DOOR.x, DOOR.w), y: DOOR.y, width: DOOR.w, height: DOOR.h }, clip);
 
-  // стена, плинтус, пол
+  const seed = flip ? 911 : 404;
+  const R = prng(seed);
+  const img = (href, x, y, w, h, { parent: into = s, ...attrs } = {}) => {
+    const n = svgEl('image', { href, x, y, width: w, height: h, preserveAspectRatio: 'none', ...attrs }, into);
+    n.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
+    return n;
+  };
+
+  // стена: краска сверху, тёмная панель снизу, плинтус, грязный пол
   svgEl('rect', { x: 0, y: 0, width: SIDE_W, height: SIDE_H, fill: `url(#${id('wall')})` }, s);
+  svgEl('rect', { x: 0, y: 520, width: SIDE_W, height: 280, fill: 'rgba(40,33,22,0.38)' }, s);
+  svgEl('rect', { x: 0, y: 512, width: SIDE_W, height: 10, fill: '#1b1d19' }, s);
+  svgEl('rect', { x: 0, y: 512, width: SIDE_W, height: 2, fill: 'rgba(160,170,150,0.12)' }, s);
   svgEl('rect', { x: 0, y: 815, width: SIDE_W, height: SIDE_H - 815, fill: `url(#${id('floor')})` }, s);
-  svgEl('rect', { x: 0, y: 800, width: SIDE_W, height: 15, fill: '#0c0d0d' }, s);
-  // доска объявлений на стене (просто тёмные листки)
-  const board = svgEl('g', { opacity: 0.5 }, s);
-  svgEl('rect', { x: X(70, 170), y: 250, width: 170, height: 220, fill: '#14110d', stroke: '#1f1b16', 'stroke-width': 6 }, board);
-  for (const [x, y, w, h] of [[88, 268, 70, 90], [168, 276, 56, 70], [92, 372, 120, 80]]) {
-    svgEl('rect', { x: X(x, w), y, width: w, height: h, fill: '#2a2823' }, board);
+  for (let x = flip ? 30 : 10; x < SIDE_W; x += 115) {                  // швы линолеума
+    svgEl('line', { x1: x, y1: 815, x2: x + (x - SIDE_W / 2) * 0.12, y2: SIDE_H, stroke: 'rgba(0,0,0,0.5)', 'stroke-width': 2 }, s);
   }
+  svgEl('rect', { x: 0, y: 800, width: SIDE_W, height: 15, fill: '#0c0d0d' }, s);
+  // грязь, подтёки, царапины по всей стене и полу
+  img(grimeTexture(585, 470, seed, { blots: 70, blotA: 0.32, streaks: 45, streakTop: true, streakA: 0.22, scratches: 40, speck: 0.015, lightSpeck: 0.05 }),
+    0, 0, SIDE_W, SIDE_H, { opacity: 0.95 });
+  // ржавое пятно от протечки у потолка
+  const sx = X(R() * 300 + (flip ? 80 : 650), 0);
+  const stain = svgEl('radialGradient', { id: id('stain') }, defs);
+  svgEl('stop', { offset: 0, 'stop-color': 'rgba(70,52,25,0.35)' }, stain);
+  svgEl('stop', { offset: 0.8, 'stop-color': 'rgba(60,45,20,0.2)' }, stain);
+  svgEl('stop', { offset: 1, 'stop-color': 'rgba(50,35,15,0)' }, stain);
+  svgEl('ellipse', { cx: sx, cy: 20, rx: 190, ry: 130, fill: `url(#${id('stain')})` }, s);
+  svgEl('ellipse', { cx: sx + 10, cy: 25, rx: 150, ry: 100, fill: 'none', stroke: 'rgba(55,40,18,0.35)', 'stroke-width': 3,
+    'stroke-dasharray': '40 6 70 10 30 5' }, s);
+  // трещины от угла двери и от потолка
+  const crack = (pts) => {
+    const d = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${X(x)},${y}`).join(' ');
+    svgEl('path', { d, fill: 'none', stroke: 'rgba(140,150,135,0.13)', 'stroke-width': 2, transform: 'translate(1.5 1.5)' }, s);
+    svgEl('path', { d, fill: 'none', stroke: '#030403', 'stroke-width': 2.2, 'stroke-linejoin': 'round' }, s);
+  };
+  crack([[DOOR.x + DOOR.w + 16, DOOR.y - 16], [DOOR.x + DOOR.w + 40, DOOR.y - 44], [DOOR.x + DOOR.w + 34, DOOR.y - 66],
+    [DOOR.x + DOOR.w + 70, DOOR.y - 95], [DOOR.x + DOOR.w + 64, 0]]);
+  crack([[DOOR.x - 16, DOOR.y + 330], [DOOR.x - 52, DOOR.y + 318], [DOOR.x - 70, DOOR.y + 340], [DOOR.x - 120, DOOR.y + 333]]);
+  // облупившаяся краска у перил
+  for (let i = 0; i < 5; i++) {
+    const px = R() * (SIDE_W - 200) + 60, py = 470 + R() * 90, pw = 18 + R() * 40, ph = 8 + R() * 22;
+    const pts = [[px, py], [px + pw * 0.6, py - ph * 0.4], [px + pw, py + ph * 0.2], [px + pw * 0.7, py + ph], [px + pw * 0.1, py + ph * 0.8]];
+    svgEl('polygon', { points: P(pts), fill: 'rgba(110,112,98,0.16)', stroke: 'rgba(0,0,0,0.5)', 'stroke-width': 1.2 }, s);
+  }
+  // потёртости от стульев на плинтусе
+  for (let i = 0; i < 7; i++) {
+    svgEl('ellipse', { cx: R() * SIDE_W, cy: 785 + R() * 20, rx: 30 + R() * 60, ry: 4 + R() * 5, fill: 'rgba(0,0,0,0.35)' }, s);
+  }
+  // розетка с треснувшей крышкой и кабель к панели кнопок
+  const sock = svgEl('g', {}, s);
+  svgEl('rect', { x: X(880, 50), y: 700, width: 50, height: 62, rx: 5, fill: '#2b2a24', stroke: '#11110e', 'stroke-width': 2 }, sock);
+  svgEl('circle', { cx: X(898), cy: 731, r: 4, fill: '#050505' }, sock);
+  svgEl('circle', { cx: X(912), cy: 731, r: 4, fill: '#050505' }, sock);
+  svgEl('path', { d: `M${X(884)},712 L${X(900)},726 L${X(896)},748`, stroke: '#0a0a08', 'stroke-width': 1.5, fill: 'none' }, sock);
+  svgEl('path', { d: `M${X(905)},${PLATE.y + PLATE.h} C${X(930)},680 ${X(860)},690 ${X(905)},700`, stroke: '#0b0b0a',
+    'stroke-width': 7, fill: 'none', 'stroke-linecap': 'round' }, s);
+
+  // пробковая доска с пожелтевшими листками
+  const board = svgEl('g', { opacity: 0.75 }, s);
+  svgEl('rect', { x: X(60, 190), y: 240, width: 190, height: 240, fill: '#2a2014', stroke: '#16120c', 'stroke-width': 8 }, board);
+  img(grimeTexture(95, 120, seed + 3, { blots: 30, blotRGB: '10,6,2', blotA: 0.4, streaks: 0, scratches: 5, speck: 0.15 }),
+    X(64, 182), 244, 182, 232, { parent: board });
+  for (const [x, y, w, h, rot, col] of [[80, 262, 76, 96, -4, '#8f8a6e'], [168, 268, 60, 72, 6, '#9a8f62'],
+    [86, 372, 128, 82, 2, '#7d7a66'], [190, 352, 40, 50, -12, '#a39468']]) {
+    const g2 = svgEl('g', { transform: `rotate(${flip ? -rot : rot} ${X(x + w / 2)} ${y + h / 2})` }, board);
+    svgEl('rect', { x: X(x, w), y, width: w, height: h, fill: col, opacity: 0.55 }, g2);
+    for (let ly = y + 14; ly < y + h - 8; ly += 9) {
+      svgEl('rect', { x: X(x + 8, w * (0.5 + R() * 0.35)), y: ly, width: w * (0.5 + R() * 0.35), height: 2, fill: 'rgba(30,25,15,0.5)' }, g2);
+    }
+    svgEl('circle', { cx: X(x + w / 2), cy: y + 5, r: 4, fill: '#7a1a14' }, g2);
+  }
+
+  // записка на скотче рядом с дверью
+  const note = svgEl('g', { transform: `rotate(${flip ? 4 : -5} ${X(DOOR.x + DOOR.w + 70)} 300)` }, s);
+  svgEl('rect', { x: X(DOOR.x + DOOR.w + 18, 150), y: 250, width: 150, height: 96, fill: '#a9a17f', opacity: 0.62 }, note);
+  svgEl('rect', { x: X(DOOR.x + DOOR.w + 70, 40), y: 242, width: 40, height: 14, fill: 'rgba(200,190,150,0.45)' }, note);
+  const nt = svgEl('text', { x: X(DOOR.x + DOOR.w + 93), y: 282, 'text-anchor': 'middle', fill: '#1c1a14', 'font-size': 14,
+    'font-family': '"Marker Felt", "Segoe Print", "Comic Sans MS", cursive', opacity: 0.85 }, note);
+  t(`office.note.${side}`).split('\n').forEach((line, i) => {
+    const ts = svgEl('tspan', { x: X(DOOR.x + DOOR.w + 93), dy: i ? 21 : 0 }, nt);
+    ts.textContent = line;
+  });
 
   // коридор за дверью: перспектива, свет лампы, враг; всё обрезано проёмом
   const D = DOOR;
@@ -236,7 +370,7 @@ function buildSide(parent, side, ctx) {
     const sx = D.x + (bx0 - D.x) * (1 - k), ex = D.x + D.w - (D.x + D.w - bx1) * (1 - k);
     svgEl('line', { x1: X(sx), y1: y, x2: X(ex), y2: y, stroke: '#1d201c', 'stroke-width': 2 }, hall);
   }
-  svgEl('rect', { x: X(bx0 + 18, bx1 - bx0 - 36), y: by0 + 14, width: bx1 - bx0 - 36, height: 6, fill: '#c8d8cc' }, hall); // лампа
+  svgEl('rect', { x: X(bx0 + 18, bx1 - bx0 - 36), y: by0 + 14, width: bx1 - bx0 - 36, height: 6, fill: '#c8d8cc', class: 'hall-lamp' }, hall); // лампа
   svgEl('polygon', { class: 'hall-cone', fill: `url(#${id('cone')})`,
     points: P([[bx0 + 10, by0 + 18], [bx1 - 10, by0 + 18], [D.x + D.w + 40, D.y + D.h], [D.x - 40, D.y + D.h]]) }, hall);
   const ew = ENEMY_DOOR.h * ENEMY_DOOR.aspect;
@@ -253,19 +387,69 @@ function buildSide(parent, side, ctx) {
     svgEl('rect', { x: X(D.x, D.w), y, width: D.w, height: 4, fill: '#0f1112' }, shutter);
     svgEl('rect', { x: X(D.x, D.w), y: y + 4, width: D.w, height: 2, fill: '#4a5154' }, shutter);
   }
-  svgEl('rect', { x: X(D.x, D.w), y: D.y + D.h - 40, width: D.w, height: 40, fill: `url(#${id('hazard')})` }, shutter);
+  for (let y = D.y; y < D.y + D.h - 40; y += 38) {                 // ламели чуть разного оттенка
+    const v = R();
+    svgEl('rect', { x: X(D.x, D.w), y: y + 6, width: D.w, height: 28,
+      fill: v < 0.5 ? `rgba(0,0,0,${(v * 0.3).toFixed(2)})` : `rgba(255,255,240,${((v - 0.5) * 0.06).toFixed(3)})` }, shutter);
+  }
+  svgEl('rect', { x: X(D.x, D.w), y: D.y + D.h - 40, width: D.w, height: 40, fill: `url(#${id('hazard')})`, opacity: 0.7 }, shutter);
+  img(grimeTexture(230, 345, seed + 4, { blots: 55, blotRGB: '90,42,10', blotA: 0.42, blotSize: 0.07, streaks: 55,
+    streakRGB: '85,40,12', streakA: 0.42, streakW: 2.5, scratches: 50, scratchAngle: 0, scratchLen: 50, speck: 0.03, lightSpeck: 0.05 }),
+  X(D.x, D.w), D.y, D.w, D.h, { parent: shutter });
+  for (const [dx, dy, rx, ry] of [[0.3, 0.45, 38, 22], [0.68, 0.7, 26, 16], [0.55, 0.22, 18, 12]]) {   // вмятины
+    const cx = X(D.x + D.w * dx), cy = D.y + D.h * dy;
+    svgEl('ellipse', { cx, cy: cy - 3, rx, ry, fill: 'rgba(0,0,0,0.35)' }, shutter);
+    svgEl('ellipse', { cx: cx + (flip ? -3 : 3), cy: cy + 4, rx: rx * 0.8, ry: ry * 0.6, fill: 'rgba(200,210,205,0.07)' }, shutter);
+  }
   svgEl('rect', { x: X(D.x + D.w / 2 - 50, 100), y: D.y + D.h - 80, width: 100, height: 18, rx: 4, fill: '#0e1011' }, shutter);
+  // наклейка, наполовину содранная
+  const stk = svgEl('g', { transform: `rotate(${flip ? 7 : -6} ${X(D.x + 110)} ${D.y + 520})` }, shutter);
+  svgEl('rect', { x: X(D.x + 50, 120), y: D.y + 500, width: 120, height: 40, fill: '#b59a2a', opacity: 0.75 }, stk);
+  svgEl('polygon', { points: P([[D.x + 140, D.y + 500], [D.x + 170, D.y + 500], [D.x + 170, D.y + 526]]), fill: '#2a2d2e' }, stk);
+  const stt = svgEl('text', { x: X(D.x + 105), y: D.y + 526, 'text-anchor': 'middle', fill: '#1a1608', 'font-size': 13,
+    'font-weight': 800, 'font-family': 'system-ui, sans-serif' }, stk);
+  stt.textContent = t('office.sticker');
+  // нацарапано на металле
+  const scr = svgEl('text', { x: X(D.x + D.w * 0.62), y: D.y + 300, 'text-anchor': 'middle', fill: 'none',
+    stroke: 'rgba(210,215,205,0.22)', 'stroke-width': 1.4, 'font-size': 64,
+    'font-family': '"Marker Felt", "Segoe Print", "Comic Sans MS", cursive', transform: `rotate(-8 ${X(D.x + D.w * 0.62)} ${D.y + 300})` }, shutter);
+  scr.textContent = t(`office.scratch.${side}`);
 
   // коробка двери и надпись «выход» над ней
   svgEl('rect', { x: X(D.x - 16, D.w + 32), y: D.y - 16, width: D.w + 32, height: D.h + 16, fill: 'none',
     stroke: `url(#${id('frame')})`, 'stroke-width': 30 }, s);
   svgEl('rect', { x: X(D.x - 4, D.w + 8), y: D.y - 4, width: D.w + 8, height: 8, fill: '#0b0c0c' }, s);
+  // ржавчина и сколы краски на коробке двери
+  const ring = svgEl('clipPath', { id: id('ring') }, defs);
+  svgEl('path', { 'clip-rule': 'evenodd', d: `M${X(D.x - 31, D.w + 62)},${D.y - 31} h${D.w + 62} v${D.h + 31} h${-(D.w + 62)} Z `
+    + `M${X(D.x - 1, D.w + 2)},${D.y - 1} h${D.w + 2} v${D.h + 1} h${-(D.w + 2)} Z` }, ring);
+  const frameWear = svgEl('g', { 'clip-path': `url(#${id('ring')})` }, s);
+  img(grimeTexture(130, 190, seed + 1, { blots: 45, blotRGB: '95,45,12', blotA: 0.55, blotSize: 0.08, streaks: 30,
+    streakRGB: '80,38,10', streakA: 0.45, streakW: 3, scratches: 30, scratchLen: 25, speck: 0.05, lightSpeck: 0.05 }),
+  X(D.x - 31, D.w + 62), D.y - 31, D.w + 62, D.h + 31, { parent: frameWear });
+  for (let i = 0; i < 14; i++) {                                   // сколы до голого металла
+    const onSide = R() < 0.7;
+    const cx = onSide ? (R() < 0.5 ? D.x - 16 : D.x + D.w + 16) + (R() - 0.5) * 20 : D.x + R() * D.w;
+    const cy = onSide ? D.y + R() * D.h : D.y - 16 + (R() - 0.5) * 20;
+    svgEl('ellipse', { cx: X(cx), cy, rx: 2 + R() * 7, ry: 2 + R() * 5, fill: R() < 0.5 ? '#4e5552' : '#5a3418', opacity: 0.8 }, frameWear);
+  }
+
+  // табличка «выход»: грязное стекло, трещина, одна буква почти погасла
   const sign = svgEl('g', { class: 'exit-sign' }, s);
-  svgEl('rect', { x: X(D.x + D.w / 2 - 95, 190), y: 38, width: 190, height: 48, rx: 4, fill: '#062a14', stroke: '#1d7a3d',
+  svgEl('rect', { x: X(D.x + D.w / 2 - 95, 190), y: 38, width: 190, height: 48, rx: 4, fill: '#051f10', stroke: '#1a5e33',
     'stroke-width': 3 }, sign);
-  const txt = svgEl('text', { x: X(D.x + D.w / 2), y: 70, 'text-anchor': 'middle', fill: '#5dff98',
+  const txt = svgEl('text', { x: X(D.x + D.w / 2), y: 70, 'text-anchor': 'middle', fill: '#4be585',
     'font-size': 26, 'font-weight': 700, 'font-family': 'ui-monospace, Menlo, Consolas, monospace', 'letter-spacing': 2 }, sign);
-  txt.textContent = t('office.exit');
+  const word = t('office.exit');
+  const dead = flip ? 2 : word.length - 3;
+  [...word].forEach((ch, i) => {
+    const ts = svgEl('tspan', i === dead ? { class: 'exit-dead' } : {}, txt);
+    ts.textContent = ch;
+  });
+  img(grimeTexture(95, 24, seed + 2, { blots: 14, blotA: 0.6, blotSize: 0.3, streaks: 4, scratches: 4, speck: 0.08 }),
+    X(D.x + D.w / 2 - 95, 190), 38, 190, 48, { parent: sign });
+  svgEl('path', { d: `M${X(D.x + D.w / 2 + 40)},38 L${X(D.x + D.w / 2 + 52)},58 L${X(D.x + D.w / 2 + 44)},70 L${X(D.x + D.w / 2 + 60)},86`,
+    stroke: 'rgba(200,255,210,0.35)', 'stroke-width': 1.2, fill: 'none' }, sign);
 
   // темнота у стыка с фото стола: шов уходит в тень
   svgEl('rect', { x: flip ? 0 : SIDE_W - 160, y: 0, width: 160, height: SIDE_H, fill: `url(#${id('seam')})` }, s);
@@ -276,12 +460,16 @@ function buildSide(parent, side, ctx) {
   plate.style.top = `${(PLATE.y / SIDE_H) * 100}%`;
   plate.style.width = `${(PLATE.w / SIDE_W) * 100}%`;
   plate.style.height = `${(PLATE.h / SIDE_H) * 100}%`;
+  plate.style.setProperty('--plate-tex', `url(${grimeTexture(90, 140, seed + 5, { blots: 25, blotRGB: '60,40,15', blotA: 0.45,
+    blotSize: 0.15, streaks: 14, streakRGB: '70,35,10', streakA: 0.4, scratches: 26, scratchLen: 20, speck: 0.1 })})`);
+  plate.style.setProperty('--tilt', `${flip ? 1.1 : -0.9}deg`);
   const mkBtn = (cls, label, intent) => {
     const b = el('button', `door-btn ${cls}`, plate);
     b.type = 'button';
     el('i', '', b);
     const span = el('span', '', b);
     span.textContent = label;
+    span.style.setProperty('--tape', `${((R() - 0.5) * 7).toFixed(1)}deg`);   // подписи на малярном скотче, криво
     b.addEventListener('pointerup', (e) => { if (e.button <= 0) emit(intent, { side }); });
     return b;
   };
@@ -890,6 +1078,7 @@ export function mount(rootEl, ctx) {
   els.stage = el('div', 'stage', root);
   els.stage.dataset.view = 'desk';
   for (const [k, v] of Object.entries(zoomVars())) els.stage.style.setProperty(k, v);
+  els.stage.style.setProperty('--grime', `url(${grimeTileUrl()})`);
   els.room = el('div', 'room', els.stage);
   els.sides = {};
   els.sides.left = buildSide(els.room, 'left', ctx);
