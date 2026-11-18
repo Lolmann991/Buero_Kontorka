@@ -85,36 +85,72 @@
     .side .exit-sign { animation: exit-glow 4s ease-in-out infinite alternate; }
     @keyframes exit-glow { from { opacity: 0.75; } to { opacity: 1; } }
     .stage.is-nopower .exit-sign { animation: none; opacity: 0.15; }
+    .exit-sign .exit-dead { animation: exit-dead 3.7s steps(1) infinite; }
+    @keyframes exit-dead { 0%, 100% { opacity: 0.18; } 41% { opacity: 0.9; } 43% { opacity: 0.18; } 44% { opacity: 0.7; } 46% { opacity: 0.18; } }
+    .side.is-lit .hall-lamp, .side.is-lit .hall-cone { animation: lamp-flick 2.9s steps(1) infinite; }
+    @keyframes lamp-flick { 0%, 100% { opacity: 1; } 63% { opacity: 0.55; } 64% { opacity: 1; } 66% { opacity: 0.4; } 67% { opacity: 1; } }
     .stage.is-dark .side-svg { filter: brightness(0.55); transition: filter 2s; }
-    /* панель с кнопками у двери */
+    /* панель с кнопками у двери: старая, поцарапанная, криво прикручена, подписи на малярном скотче */
     .door-plate {
       position: absolute; box-sizing: border-box;
       display: flex; flex-direction: column; align-items: center; justify-content: space-evenly;
-      background: linear-gradient(180deg, #2a2f31, #16191a);
-      border: max(2px, 0.25cqw) solid #3d4447; border-radius: 0.6cqw;
-      box-shadow: 0 0 2cqw rgba(0, 0, 0, 0.8), inset 0 0 1cqw rgba(0, 0, 0, 0.6);
+      background:
+        radial-gradient(circle at 11% 5%, #7b7c74 0 0.28cqw, #262622 0.32cqw 0.42cqw, transparent 0.46cqw),
+        radial-gradient(circle at 89% 5%, #6b6a60 0 0.28cqw, #262622 0.32cqw 0.42cqw, transparent 0.46cqw),
+        radial-gradient(circle at 11% 95%, #5e4a30 0 0.28cqw, #262622 0.32cqw 0.42cqw, transparent 0.46cqw),
+        radial-gradient(circle at 89% 95%, #73746c 0 0.28cqw, #262622 0.32cqw 0.42cqw, transparent 0.46cqw),
+        var(--plate-tex, none) center / 100% 100%,
+        linear-gradient(172deg, #3d3f39, #272924 55%, #1b1c19);
+      border: max(2px, 0.22cqw) solid #44453d; border-radius: 0.35cqw;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 240, 0.05), inset 0 -0.7cqw 1.4cqw rgba(0, 0, 0, 0.55),
+        0.25cqw 0.35cqw 0 rgba(0, 0, 0, 0.6), 0 0 2.2cqw rgba(0, 0, 0, 0.85);
+      transform: rotate(var(--tilt, -1deg));
+    }
+    .door-plate::before {                         /* трещина в пластике */
+      content: ""; position: absolute; left: 62%; top: 0; width: 1px; height: 22%;
+      background: linear-gradient(#000, rgba(0, 0, 0, 0.2)); transform: rotate(14deg); transform-origin: top;
+    }
+    .door-plate::after {                          /* кусок серого скотча на углу */
+      content: ""; position: absolute; right: -0.9cqw; bottom: 9%; width: 3.6cqw; height: 1.1cqw;
+      background: var(--grime), linear-gradient(#77786f, #5d5e56); opacity: 0.85; transform: rotate(-38deg);
+      box-shadow: 0 0.1cqw 0.2cqw rgba(0, 0, 0, 0.5);
     }
     .door-btn {
-      position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.5cqw;
+      position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.6cqw;
       padding: 0; border: 0; background: none; cursor: pointer; touch-action: manipulation;
-      color: #b9c4bd; font: 700 max(10px, 1.15cqw) / 1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-      letter-spacing: 0.08em;
     }
     .door-btn::after { content: ""; position: absolute; inset: -0.8cqw; }
+    /* кнопка: металлическая обойма и стёртый пластиковый колпачок */
     .door-btn i {
-      display: block; width: max(34px, 5.2cqw); height: max(34px, 5.2cqw); border-radius: 50%;
-      border: max(2px, 0.3cqw) solid #0b0c0c; box-sizing: border-box;
-      box-shadow: inset 0 -0.4cqw 0.8cqw rgba(0, 0, 0, 0.6), 0 0.3cqw 0.6cqw rgba(0, 0, 0, 0.7);
-      transition: background 0.1s, box-shadow 0.1s;
+      position: relative; display: block; width: max(36px, 5.4cqw); height: max(36px, 5.4cqw); border-radius: 50%;
+      background: radial-gradient(circle, #121210 60%, #4a4a43 63%, #2b2b27 68%, #50504a 72%, #1c1c19 76%);
+      box-shadow: 0 0.35cqw 0.6cqw rgba(0, 0, 0, 0.75);
     }
-    .door-btn--door i { background: radial-gradient(circle at 40% 35%, #6a2020, #3a0b0b); }
-    .door-btn--door.is-on i { background: radial-gradient(circle at 40% 35%, #ff6a6a, #c01818);
-      box-shadow: 0 0 2cqw 0.4cqw rgba(255, 40, 40, 0.6), inset 0 -0.4cqw 0.8cqw rgba(0, 0, 0, 0.3); }
-    .door-btn--light i { background: radial-gradient(circle at 40% 35%, #4d524c, #222622); }
-    .door-btn--light.is-on i { background: radial-gradient(circle at 40% 35%, #ffffff, #cfe8d3);
-      box-shadow: 0 0 2cqw 0.4cqw rgba(220, 255, 230, 0.55), inset 0 -0.4cqw 0.8cqw rgba(0, 0, 0, 0.2); }
-    .door-btn.is-on span { color: #fff; }
-    .door-btn:active i { transform: translateY(1px) scale(0.97); }
+    .door-btn i::before {
+      content: ""; position: absolute; inset: 15%; border-radius: 50%;
+      background: var(--grime), var(--cap); background-size: 220% 220%, auto;
+      box-shadow: inset 0 -0.35cqw 0.6cqw rgba(0, 0, 0, 0.6), inset 0 0.2cqw 0.3cqw rgba(255, 255, 255, 0.12);
+      transition: box-shadow 0.1s, filter 0.1s;
+    }
+    .door-btn i::after {                          /* потёртый блик */
+      content: ""; position: absolute; left: 27%; top: 22%; width: 22%; height: 14%; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.18); filter: blur(1px); transform: rotate(-25deg);
+    }
+    .door-btn--door i { --cap: radial-gradient(circle at 40% 35%, #6e2a24, #3b0f0c 72%); }
+    .door-btn--door.is-on i { --cap: radial-gradient(circle at 40% 35%, #ff6a5a, #b81a12 75%); }
+    .door-btn--door.is-on i::before { box-shadow: 0 0 1.8cqw 0.4cqw rgba(255, 50, 30, 0.55), inset 0 -0.3cqw 0.6cqw rgba(0, 0, 0, 0.35); }
+    .door-btn--light i { --cap: radial-gradient(circle at 40% 35%, #6b675a, #2d2b25 72%); }
+    .door-btn--light.is-on i { --cap: radial-gradient(circle at 40% 35%, #fff7d6, #cdb978 78%); }
+    .door-btn--light.is-on i::before { box-shadow: 0 0 1.8cqw 0.4cqw rgba(255, 240, 190, 0.5), inset 0 -0.3cqw 0.6cqw rgba(0, 0, 0, 0.2); }
+    .door-btn:active i::before { filter: brightness(0.85); transform: scale(0.96); }
+    /* подписи: малярный скотч и маркер */
+    .door-btn span {
+      padding: 0.15cqw 0.7cqw; transform: rotate(var(--tape, 0deg));
+      background: var(--grime), linear-gradient(#cfc39c, #b9ad86); background-size: 300% 300%, auto;
+      color: #1b1a14; font: 700 max(10px, 1.15cqw) / 1.1 "Marker Felt", "Segoe Print", "Comic Sans MS", cursive;
+      letter-spacing: 0.04em; box-shadow: 0 0.1cqw 0.2cqw rgba(0, 0, 0, 0.5); opacity: 0.88;
+      clip-path: polygon(0 8%, 4% 0, 97% 4%, 100% 92%, 95% 100%, 3% 96%);
+    }
     .stage.is-nopower .door-btn { opacity: 0.35; pointer-events: none; }
     /* края фото уходят в тень на стыке со стенами */
     .fx-edge { top: 0; bottom: 0; width: 9%; }
@@ -139,7 +175,8 @@
     /* кнопки взгляда */
     .nav-btn {
       position: absolute; z-index: 3; padding: 0; display: none; align-items: center; justify-content: center;
-      background: rgba(0, 0, 0, 0.45); color: #cfe9d6; border: 1px solid rgba(160, 230, 180, 0.3); border-radius: 0.5cqw;
+      background: var(--grime), rgba(0, 0, 0, 0.5); color: #cfe9d6; border: 1px solid rgba(160, 230, 180, 0.22); border-radius: 0.3cqw;
+      box-shadow: inset 0 0 0.6cqw rgba(0, 0, 0, 0.7);
       font: 700 max(11px, 1.2cqw) / 1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.08em;
       cursor: pointer; touch-action: manipulation; opacity: 0.7; transition: opacity 0.15s, background 0.15s;
     }
@@ -170,7 +207,8 @@
     .office-hud {
       position: absolute; z-index: 3; left: 1.2cqw; bottom: 1.2cqw; width: max(170px, 17cqw);
       padding: 0.7cqw 0.9cqw; box-sizing: border-box; display: none; flex-direction: column; gap: 0.45cqw;
-      background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(160, 230, 180, 0.25); border-radius: 0.4cqw;
+      background: var(--grime), rgba(0, 0, 0, 0.6); border: 1px solid rgba(160, 230, 180, 0.2); border-radius: 0.25cqw;
+      box-shadow: inset 0 0 0.8cqw rgba(0, 0, 0, 0.7);
       color: #d6f0dc; font: 700 max(10px, 1.05cqw) / 1.1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
       letter-spacing: 0.05em; pointer-events: none;
     }
@@ -186,7 +224,8 @@
     .office-hud .hud-load__bar i { width: max(8px, 0.9cqw); height: max(7px, 0.7cqw); }
     @media (prefers-reduced-motion: reduce) {
       .room, .side .door-shutter { transition-duration: 0.01s; }
-      .side.is-lit.has-enemy .hall-dark, .stage.is-warning .scene, .stage.is-warning .side-svg, .side .exit-sign { animation: none; }
+      .side.is-lit.has-enemy .hall-dark, .stage.is-warning .scene, .stage.is-warning .side-svg, .side .exit-sign,
+      .exit-sign .exit-dead, .side.is-lit .hall-lamp, .side.is-lit .hall-cone { animation: none; }
     }
     .desk-photo {
       position: absolute;
@@ -739,6 +778,163 @@
     .scare-tint { position: absolute; inset: 0; pointer-events: none;
       background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.25) 0 1px, transparent 1px 3px); }
     .scare[data-phase="black"] .scare-tint, .scare[data-phase="flash"] .scare-tint { display: none; }
+
+    /* ---------- кофемашина ---------- */
+    .coffee-btn { position: absolute; z-index: 2; padding: 0; margin: 0; border: 0; background: transparent; cursor: pointer;
+      border-radius: 0.6cqw; touch-action: manipulation; }
+    .coffee-btn:hover, .coffee-btn:focus-visible { box-shadow: 0 0 0 2px rgba(255, 220, 160, 0.35), 0 0 2cqw rgba(255, 200, 120, 0.15); }
+    .coffee-disp { position: absolute; display: grid; place-items: center; overflow: hidden; white-space: nowrap;
+      color: #7dff9a; font: 700 max(8px, 0.85cqw) / 1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.06em;
+      text-shadow: 0 0 6px rgba(125, 255, 154, 0.7); pointer-events: none; }
+    .coffee-btn[data-mode="brew"] .coffee-disp { color: #ffd27a; text-shadow: 0 0 6px rgba(255, 200, 100, 0.7); animation: cam-blink 0.6s step-end infinite; }
+    .coffee-btn[data-mode="wait"] .coffee-disp { color: #ff8a6a; text-shadow: 0 0 6px rgba(255, 120, 90, 0.6); }
+    .coffee-btn[data-mode="off"] .coffee-disp { color: transparent; text-shadow: none; }
+    .coffee-tip { position: absolute; left: 50%; top: -2.4cqw; transform: translateX(-50%); padding: 0.3cqw 0.7cqw; white-space: nowrap;
+      background: rgba(0, 0, 0, 0.75); color: #f2dcb0; font: 700 max(9px, 0.9cqw) / 1 ui-monospace, Menlo, monospace;
+      border: 1px solid rgba(255, 220, 160, 0.4); opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    .coffee-btn:hover .coffee-tip, .coffee-btn:focus-visible .coffee-tip { opacity: 1; }
+    .side .coffee-steam, .side .coffee-stream { opacity: 0; transition: opacity 0.4s; }
+    .side.is-brewing .coffee-stream { opacity: 1; }
+    .side.is-brewing .coffee-steam { opacity: 1; animation: steam-rise 1.6s ease-in-out infinite; }
+    @keyframes steam-rise { 0% { transform: translateY(6px); opacity: 0.2; } 50% { opacity: 1; } 100% { transform: translateY(-14px); opacity: 0; } }
+
+    /* ---------- усталость: края темнеют, веки закрываются ---------- */
+    .tired { position: absolute; inset: 0; z-index: 2; pointer-events: none; --lid: 0; }
+    .tired-veil { position: absolute; inset: 0; opacity: 0;
+      background: radial-gradient(ellipse at 50% 48%, transparent 28%, rgba(4, 2, 10, 0.75) 72%, rgba(0, 0, 0, 0.95) 100%); }
+    .lid { position: absolute; left: -5%; right: -5%; height: 52%; background: #020102; }
+    .lid--top { top: 0; border-radius: 0 0 50% 50% / 0 0 18% 18%; transform: translateY(calc((var(--lid) - 1) * 100%)); }
+    .lid--bottom { bottom: 0; border-radius: 50% 50% 0 0 / 18% 18% 0 0; transform: translateY(calc((1 - var(--lid)) * 100%)); }
+    .oh-bar--tired { flex: 1; max-width: 55%; }
+    .oh-bar--tired i { background: #9a6aff !important; }
+
+    /* ---------- украшения ---------- */
+    .deco-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+    .deco-bulb { animation: bulb 2.4s ease-in-out infinite; }
+    @keyframes bulb { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .deco-blob { animation: blob 7s ease-in-out infinite alternate; }
+    .deco-blob--b { animation-duration: 9s; animation-delay: -3s; }
+    .deco-blob--c { animation-duration: 11s; animation-delay: -6s; }
+    @keyframes blob { from { transform: translateY(14px); } to { transform: translateY(-50px); } }
+    .deco-lava-glow { animation: bulb 5s ease-in-out infinite; }
+    .stage.is-nopower .deco-bulb, .stage.is-nopower .deco-lava-glow { animation: none; opacity: 0.1; }
+    @media (prefers-reduced-motion: reduce) {
+      .deco-bulb, .deco-blob, .deco-lava-glow, .side.is-brewing .coffee-steam { animation: none; }
+    }
+
+    /* ---------- магазин ---------- */
+    .shop { position: absolute; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center;
+      padding: 1rem; background: rgba(0, 0, 0, 0.92); overflow-y: auto; }
+    .shop[hidden] { display: none; }
+    .shop-box { width: min(96vw, 860px); max-height: 100%; display: flex; flex-direction: column; gap: 0.6rem; }
+    .shop-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+    .shop-title { margin: 0; font-size: clamp(1.3rem, 4vw, 2rem); letter-spacing: 0.06em; }
+    .shop-coins { color: #f2c230; font-weight: 700; font-size: 1.1rem; }
+    .shop-hint { margin: 0; opacity: 0.7; font-size: 0.85rem; }
+    .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.7rem; overflow-y: auto; }
+    .shop-card { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.6rem; border: 1px solid #2c3a2c; border-radius: 0.4rem;
+      background: linear-gradient(#141a14, #0b0e0b); }
+    .shop-card.is-owned { border-color: #4a6a3a; }
+    .shop-pv { width: 100%; height: 90px; background: radial-gradient(ellipse at center, #1e241e, #0a0c0a); border-radius: 0.3rem; }
+    .shop-name { font-size: 0.95rem; }
+    .shop-desc { margin: 0; font-size: 0.75rem; opacity: 0.7; flex: 1; }
+    .shop-btn { min-height: 2.4rem; border: 2px solid #b8920e; border-radius: 0.3rem; background: #2a2208; color: #ffe08a;
+      font: inherit; font-weight: 700; touch-action: manipulation; cursor: pointer; }
+    .shop-btn:disabled { border-color: #444; background: #151515; color: #777; cursor: not-allowed; }
+    .shop-btn--ghost { border-color: #3a5a3a; background: transparent; color: #cfe9d6; }
+    .shop-close { align-self: center; }
+
+    /* ---------- монеты ---------- */
+    .coin-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+    .coin {
+      position: absolute; width: max(20px, 2.1cqw); height: max(20px, 2.1cqw); margin: 0; padding: 0;
+      transform: translate(-50%, -50%) rotate(-8deg); border-radius: 50%; cursor: pointer; pointer-events: auto;
+      border: max(2px, 0.2cqw) solid #8a6a12;
+      background: radial-gradient(circle at 35% 30%, #fff6c0, #f2c230 35%, #b88a14 75%, #7a5a0a);
+      box-shadow: 0 0 0.8cqw 0.15cqw rgba(255, 210, 80, 0.45), inset 0 0 0.3cqw rgba(0, 0, 0, 0.5);
+      animation: coin-glint 2.6s ease-in-out infinite; touch-action: manipulation;
+    }
+    .coin::before { content: "K"; position: absolute; inset: 0; display: grid; place-items: center;
+      color: #7a5a0a; font: 800 max(11px, 1.1cqw) / 1 system-ui, sans-serif; }
+    .coin::after { content: ""; position: absolute; inset: -12px; }
+    .cam-coin { width: 26px; height: 26px; border-width: 2px; box-shadow: 0 0 10px 3px rgba(255, 255, 200, 0.7); z-index: 2; }
+    .cam-coin::before { font-size: 13px; }
+    @keyframes coin-glint { 0%, 80%, 100% { filter: brightness(1); } 88% { filter: brightness(1.8); } }
+    .oh-info { color: #e9d27a; font-size: max(9px, 0.9cqw); }
+
+    /* ---------- меню: звёзды и статистика ---------- */
+    .menu-stars { font-size: clamp(1.4rem, 4vw, 2.2rem); letter-spacing: 0.25em; color: #f2c230;
+      text-shadow: 0 0 10px rgba(242, 194, 48, 0.5); }
+    .menu-stats { margin: 0; color: #e9d27a; opacity: 0.9; }
+    .menu-week { margin: 0; color: #8dff8d; }
+    .menu-week[hidden] { display: none; }
+
+    /* ---------- конец ночи: 6 AM ---------- */
+    @font-face { font-family: "Digital7"; src: url("assets/fonts/digital-7.ttf") format("truetype"); font-display: swap; }
+    .end-six, .end-check, .end-over { position: absolute; inset: 0; z-index: 11; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1rem; background: #000; text-align: center; padding: 1rem; }
+    .end-six[hidden], .end-check[hidden], .end-over[hidden] { display: none; }
+    .end-six__clock { font-family: "Digital7", ui-monospace, monospace; font-size: clamp(4rem, 18vw, 11rem); line-height: 1;
+      color: #14d014; text-shadow: 0 0 18px rgba(20, 208, 20, 0.7); display: flex; align-items: baseline; gap: 0.15em; }
+    .end-six__h { display: inline-block; min-width: 0.6em; }
+    .end-six.is-rolled .end-six__h { animation: six-roll 0.5s ease-out 1; }
+    @keyframes six-roll { from { transform: translateY(-60%); opacity: 0; } to { transform: none; opacity: 1; } }
+    .end-six__am { font-size: 0.45em; }
+    .end-six__night { color: #d8e6d8; font-size: clamp(1rem, 3vw, 1.6rem); letter-spacing: 0.15em; opacity: 0; }
+    .end-six.is-rolled .end-six__night { animation: six-fade 1s 0.4s ease-out forwards; }
+    @keyframes six-fade { to { opacity: 1; } }
+
+    /* ---------- зарплатный чек ---------- */
+    .end-check { background: radial-gradient(ellipse at center, #1a1f1a, #000 75%); gap: 0.7rem; overflow-y: auto; }
+    .pc {
+      position: relative; box-sizing: border-box; width: min(92vw, 640px); padding: 14px 20px 12px;
+      background: linear-gradient(135deg, #f3ecd2, #e6dbb6); color: #2b2a24; text-align: left;
+      border: 1px solid #b9ab7d; border-radius: 4px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+      background-image: repeating-linear-gradient(45deg, rgba(120, 140, 90, 0.07) 0 2px, transparent 2px 8px),
+        linear-gradient(135deg, #f3ecd2, #e6dbb6);
+      font: 14px/1.35 Georgia, "Times New Roman", serif;
+      transform: rotate(-1.2deg) translateY(30px); opacity: 0;
+    }
+    .end-check.is-in .pc { animation: pc-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+    @keyframes pc-in { to { transform: rotate(-1.2deg); opacity: 1; } }
+    .pc-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #4a5a3a;
+      padding-bottom: 4px; margin-bottom: 8px; }
+    .pc-bank { font-weight: 700; letter-spacing: 0.12em; color: #2d4a2a; }
+    .pc-no { font: 12px ui-monospace, Menlo, monospace; color: #6a634a; }
+    .pc-row { display: flex; gap: 10px; align-items: baseline; margin: 3px 0; }
+    .pc-label { flex: none; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6a634a; }
+    .pc-val { flex: 1; border-bottom: 1px dotted #8a8266; font-family: "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive; font-weight: 400; }
+    .pc-amount { position: absolute; right: 20px; top: 46px; display: flex; align-items: baseline; gap: 6px;
+      padding: 4px 10px; border: 2px solid #4a5a3a; background: rgba(255, 255, 255, 0.4); font-size: 22px; }
+    .pc-cur { font-size: 16px; }
+    .pc-lines { margin: 6px 0 4px; font-size: 12px; color: #5a5440; }
+    .pc-memo { margin-top: 6px; padding: 6px 8px; background: rgba(0, 0, 0, 0.05); border-left: 3px solid #8a3a2a; }
+    .pc-memo__text { display: block; margin-top: 2px; font-family: "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive; font-size: 15px; color: #1d2a6a; }
+    .pc-foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px; }
+    .pc-micr { font: 13px ui-monospace, Menlo, monospace; letter-spacing: 0.1em; color: #3a3a3a; }
+    .pc-sign { font-family: "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive; font-size: 17px; color: #1d2a6a;
+      border-top: 1px solid #8a8266; padding: 2px 8px 0; }
+    .pc-stamp { position: absolute; right: 26%; top: 38%; padding: 4px 12px; border: 3px solid #b3261e; border-radius: 6px;
+      color: #b3261e; font: 800 20px/1 system-ui, sans-serif; letter-spacing: 0.15em; transform: rotate(-14deg) scale(2.2);
+      opacity: 0; mix-blend-mode: multiply; pointer-events: none; }
+    .end-check.is-stamped .pc-stamp { animation: pc-stamp 0.25s ease-in forwards; }
+    @keyframes pc-stamp { to { transform: rotate(-14deg) scale(1); opacity: 0.85; } }
+    .end-check__total { color: #e9d27a; font-size: 0.95rem; }
+    .end-check__next { color: #d8e6d8; opacity: 0.8; font-size: 0.9rem; }
+
+    /* ---------- Game Over ---------- */
+    .end-over { background: #000; overflow: hidden; }
+    .end-over__noise { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; opacity: 0.22; }
+    .end-over > :not(canvas) { position: relative; }
+    .end-over__title { margin: 0; color: #ff3030; font: 800 clamp(2.5rem, 10vw, 6rem) / 1 ui-monospace, Menlo, monospace;
+      letter-spacing: 0.1em; text-shadow: 3px 0 #00e5ff, -3px 0 #ff0030; animation: over-shake 0.4s steps(2) infinite; }
+    @keyframes over-shake { 0% { transform: translate(0, 0); } 50% { transform: translate(-2px, 1px) skewX(-3deg); } }
+    .end-over__sub { margin: 0; color: #d8e6d8; letter-spacing: 0.12em; }
+    .end-over__jab { margin: 0; max-width: 34rem; color: #ffb0b0; font-style: italic; }
+    .end-over__btns { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+    @media (prefers-reduced-motion: reduce) {
+      .coin, .end-over__title, .end-six.is-rolled .end-six__h { animation: none; }
+    }
 
     /* ---------- стартовый экран ---------- */
     .start-screen {

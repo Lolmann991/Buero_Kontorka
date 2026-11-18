@@ -25,8 +25,18 @@ function initial() {
     lights: { left: false, right: false },  // горит ли свет в проёме двери (+1 к нагрузке)
     view: 'desk',       // куда смотрит игрок: desk | left | right | cams (приближен к монитору камер)
     phone: { status: 'idle', kind: null, id: null, name: null, t: 0, sub: null }, // звонки в Teams (calls.js): status incoming | playing | ringing | noanswer | open
-    flags: { demoDone: false, ending: null, unlocked: [] },
+    coins: [],          // монеты, спрятанные этой ночью: [{ id, where: cam|left|right|desk, cam, x, y }]
+    coinsNight: 0,      // сколько монет подобрано за эту ночь
+    fatigue: 0,         // усталость 0–100: растёт за ночь, кофе снимает (coffee.js)
+    coffee: { brewing: false, left: 0, cooldown: 0 },   // кофемашина: варит, осталось (с), до готовности снова (с)
+    flags: defaultFlags(),
   };
+}
+
+// stars: сколько ночей пройдено (звёзды в меню); coins: всего собрано монет; money: заработано (центы); weekDone: пройдена 5-я ночь
+function defaultFlags() {
+  // deco: купленные украшения кабинета; decoOff: купленные, но убранные
+  return { demoDone: false, ending: null, unlocked: [], stars: 0, coins: 0, money: 0, weekDone: false, deco: [], decoOff: [] };
 }
 
 const _state = initial();
@@ -125,6 +135,10 @@ export function newNight(n, cfg = {}) {
   _state.doors = { left: false, right: false };
   _state.lights = { left: false, right: false };
   _state.view = 'desk';
+  _state.coins = [];
+  _state.coinsNight = 0;
+  _state.fatigue = cfg.fatigue?.start ?? 0;
+  _state.coffee = { brewing: false, left: 0, cooldown: 0 };
   _state.phone = { status: 'idle', kind: null, id: null, name: null, t: 0, sub: null };
   emit('night:start', { n });
 }
@@ -163,7 +177,7 @@ export function load() {
     _state.night = d.night;
     _state.appetite = d.appetite;
     _state.mgScore = d.mgScore;
-    _state.flags = d.flags;
+    _state.flags = { ...defaultFlags(), ...(d.flags || {}) };
     return true;
   } catch (e) {
     console.warn('save: сохранение повреждено, сброшено', e);
@@ -179,14 +193,15 @@ export function resetSave() {
 }
 
 // Нагрузка по правилам раздела 5: фон 1, камера +1, звонок-приманка +2, починка +1.
-// Кабинет: каждая закрытая дверь +1, каждый включённый свет в проёме +1.
+// Кабинет: каждая закрытая дверь +1, каждый включённый свет в проёме +1, кофемашина пока варит +2.
 export function recalcLoad() {
   set('load', 1
     + (_state.camera !== null ? 1 : 0)
     + (_state.call.active ? 2 : 0)
     + (_state.repairing ? 1 : 0)
     + (_state.doors.left ? 1 : 0) + (_state.doors.right ? 1 : 0)
-    + (_state.lights.left ? 1 : 0) + (_state.lights.right ? 1 : 0));
+    + (_state.lights.left ? 1 : 0) + (_state.lights.right ? 1 : 0)
+    + (_state.coffee.brewing ? 2 : 0));
 }
 
 // Списание токенов: нагрузка × 0,1% в секунду. Потраченное копится в аппетите ИИ.

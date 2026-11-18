@@ -1,16 +1,21 @@
 // Единственный игровой цикл. Другие модули время берут только из события tick.
 
-import { state, set, patch, emit, on, newNight, recalcLoad, tickTokens } from './state.js';
+import { state, set, patch, emit, on, newNight, recalcLoad, tickTokens, save, load } from './state.js';
 import { loadLang, t } from './i18n.js';
 import * as audio from './audio.js';
 import * as desk from './ui/desk.js';
 import * as cameras from './ui/cameras.js';
 import * as teams from './ui/teams.js';
+import * as screens from './ui/screens.js';
+import * as decoUi from './ui/deco.js';
 import * as tickets from './tickets.js';
 import * as glitches from './glitches.js';
 import * as calls from './calls.js';
 import * as graph from './graph.js';
 import * as mr404 from './enemies/mr404.js';
+import * as coins from './coins.js';
+import * as coffee from './coffee.js';
+import './deco.js';
 import { initDebug } from './debug.js';
 
 const ENEMY_MODULES = { mr404 };   // id врага из nights.json -> модуль src/enemies/<id>.js
@@ -69,8 +74,42 @@ on('tick', ({ dt }) => {
 });
 
 // ---------- намерения интерфейса ----------
+// ---------- ночи, прогресс и сохранение ----------
+export const MAX_NIGHT = 5;
+const clampNight = (n) => Math.min(MAX_NIGHT, Math.max(1, Math.floor(Number(n) || 1)));
+
+// Новая игра: снова с первой ночи. Звёзды, монеты и заработок остаются (это достижения).
+on('intent:newGame', () => {
+  if (state.running) return;
+  set('night', 1);
+  save();
+  emit('progress:change');
+});
+
+// Зарплата за ночь (центы): оклад стажёра растёт на 25 центов за ночь, монета даёт 10 центов.
+const PAY_BASE = 250, PAY_STEP = 25, PAY_COIN = 10;
+
+// Итог ночи считается здесь, ui/desk.js рисует экран «6 AM», чек или «Game Over» по событию night:result.
+on('night:end', ({ n, failed } = {}) => {
+  const night = n ?? state.night;
+  const result = { n: night, failed: !!failed, coins: state.coinsNight, time: state.time, week: false, pay: 0,
+    coinPay: PAY_COIN * state.coinsNight, coinUnit: PAY_COIN };
+  if (!failed) {
+    result.pay = PAY_BASE + PAY_STEP * (night - 1) + result.coinPay;
+    set('flags.stars', Math.max(state.flags.stars || 0, night));
+    set('flags.money', (state.flags.money || 0) + result.pay);
+    if (night >= MAX_NIGHT) { set('flags.weekDone', true); result.week = true; }
+    set('night', clampNight(night + 1));
+  }
+  save();
+  result.totalCoins = state.flags.coins || 0;
+  result.totalMoney = state.flags.money || 0;
+  emit('night:result', result);
+});
+
 on('intent:startShift', () => {
   if (state.running) return;
+  set('night', clampNight(state.night));
   audio.init();
   overloaded = false;
   warning = false;
@@ -124,7 +163,7 @@ on('intent:door', ({ side, closed } = {}) => {
   if (state.doors[side] === want) return;
   set(`doors.${side}`, want);
   recalcLoad();
-  audio.play(want ? 'door_slam' : 'door_open', { pan: DOOR_PAN[side], volume: want ? 0.7 : 0.55 });
+  audio.play('shutter', { pan: DOOR_PAN[side], volume: want ? 1 : 0.6 });
   emit('door:change', { side, closed: want });
 });
 
@@ -289,7 +328,7 @@ on('tick', ({ dt }) => {
 });
 
 // Враги получают звонки и команды отладки через onEvent, а не подписываются сами.
-for (const name of ['call:start', 'call:end', 'debug:enemy']) {
+for (const name of ['call:start', 'call:end', 'debug:enemy', 'noise']) {
   on(name, (payload) => enemies.forEach((e) => e.onEvent(name, payload)));
 }
 
@@ -301,6 +340,19 @@ on('jumpscare', ({ enemyId }) => {
 });
 
 on('night:end', () => { enemies = []; });
+
+// ---------- монеты ----------
+on('night:start', () => coins.start(nights[state.night]?.coins ?? {}));
+on('tick', () => { if (state.running) coins.update(); });
+on('coin:collect', () => audio.play('coin'));
+
+// ---------- усталость и кофемашина ----------
+on('night:start', () => coffee.start(nights[state.night]?.fatigue ?? {}));
+on('tick', ({ dt }) => { if (state.running) coffee.update(dt); });
+let brewSnd = null;
+on('coffee:start', () => { audio.stop(brewSnd); brewSnd = audio.play('coffee_brew', { pan: DOOR_PAN.left }); });
+on('coffee:done', () => { brewSnd = null; audio.play('coffee_done', { pan: DOOR_PAN.left }); });
+on('coffee:cancel', () => { audio.stop(brewSnd); brewSnd = null; });
 
 // Прослушанная запись ночи открывает привязанные к ней записи архива (flags.unlocked: 'call:<id>').
 // Открывает только запись, прослушанная до конца: call:end story с outcome 'finished' (решено разработчиком).
@@ -366,6 +418,61 @@ on('ticket:pressure', ({ id, key }) => {
   setTimeout(() => { audio.stop(kb); if (state.running) audio.play('teams_pressure'); }, sec * 1000);
 });
 on('glitch', ({ source }) => { if (source === 'ai') audio.play('glitch_ai'); });
+// ---------- шаги врага рядом: сердцебиение, дыхание за дверью, свет в коридоре ----------
+// Уровень угрозы: 0 далеко; 1 в зале у кабинета; 2 стоит и смотрит (окно атаки); 3 у двери или уже внутри.
+const NEAR_DESK = new Set(['s_hall1', 's_hall2', 's_hall3']);
+const HEART = [null, { volume: 0.3, rate: 0.9 }, { volume: 0.6, rate: 1.1 }, { volume: 1.0, rate: 1.4 }];
+let heartSnd = null;
+let breathSnd = null;
+let stingArmed = false;          // испуг играет один раз за визит к двери
+const buzzSnd = { left: null, right: null };
+
+function threat() {
+  let lvl = 0;
+  for (const e of Object.values(state.enemies)) {
+    if (!e) continue;
+    if (e.status === 'door' || e.status === 'warning') lvl = Math.max(lvl, 3);
+    else if (e.dwell) lvl = Math.max(lvl, 2);
+    else if (NEAR_DESK.has(e.pos) && (e.status === 'idle' || e.status === 'dash')) lvl = Math.max(lvl, 1);
+  }
+  return lvl;
+}
+
+on('tick', () => {
+  const lvl = state.running ? threat() : 0;
+  if (lvl && !heartSnd) heartSnd = audio.play('heartbeat', { loop: true, volume: HEART[lvl].volume });
+  else if (!lvl && heartSnd) { audio.stop(heartSnd); heartSnd = null; }
+  if (heartSnd && lvl) audio.tune(heartSnd, HEART[lvl]);
+});
+
+const enemyAtDoor = (side) => Object.values(state.enemies).some((e) => e?.status === 'door' && e.door === side);
+
+on('enemy:status', ({ status, door }) => {
+  if (status === 'door') {
+    audio.stop(breathSnd);
+    breathSnd = audio.play('breath', { loop: true, pan: DOOR_PAN[door] ?? 0 });
+    audio.play('growl', { pan: DOOR_PAN[door] ?? 0, volume: 0.7 });
+    stingArmed = true;
+    if (state.lights[door] && state.view === door) { audio.play('sting'); stingArmed = false; }
+  } else if (breathSnd) {
+    audio.stop(breathSnd);
+    breathSnd = null;
+  }
+});
+
+on('light:change', ({ side, on: lit }) => {
+  if (lit && !buzzSnd[side]) buzzSnd[side] = audio.play('light_buzz', { loop: true, pan: DOOR_PAN[side] });
+  else if (!lit && buzzSnd[side]) { audio.stop(buzzSnd[side]); buzzSnd[side] = null; }
+  if (lit && stingArmed && enemyAtDoor(side)) { audio.play('sting'); stingArmed = false; }
+});
+
+function stopThreatSounds() {
+  audio.stop(heartSnd); heartSnd = null;
+  audio.stop(breathSnd); breathSnd = null;
+  for (const side of SIDES) { audio.stop(buzzSnd[side]); buzzSnd[side] = null; }
+}
+on('night:end', stopThreatSounds);
+
 // Фон: гул и ночь всегда; напряжение при перегрузке сети и во время предупреждения об атаке; темнота с ночи 4.
 let overloaded = false;
 let warning = false;
@@ -417,6 +524,8 @@ async function loadJSON(path) {
 }
 
 async function boot() {
+  load();                          // сохранение: ночь, звёзды, монеты (если есть)
+  set('night', clampNight(state.night));
   await loadLang('ru');
   graph.loadGraph(await loadJSON('data/rooms.json'));
   try {
@@ -450,6 +559,8 @@ async function boot() {
   desk.mount(document.getElementById('app'), ctx);
   cameras.mount(document.getElementById('monitor-left'), ctx);
   teams.mount(document.getElementById('monitor-right'), ctx);
+  screens.mount(document.getElementById('app'), ctx);
+  decoUi.mount(document.getElementById('app'), ctx);
   initDebug();
 
   requestAnimationFrame(frame);

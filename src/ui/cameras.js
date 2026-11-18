@@ -82,7 +82,7 @@ function buildMap(parent, ctx) {
     const shapes = [m, ...m.extra].map((r) =>
       svg('rect', { class: cls, x: r.x, y: r.y, width: r.w, height: r.h }, canvas));
     els.rooms[id] = shapes;
-    if (isBlind(id) && id !== PLAYER_POS) {
+    if (isBlind(id) && id.includes('toilet')) {   // слепые зоны без камер; подписаны только туалеты
       const wc = svg('text', { class: 'wc', x: m.x + m.w / 2, y: m.y + m.h / 2 }, canvas);
       wc.textContent = T('cams.map.wc');
     }
@@ -575,6 +575,26 @@ function renderRepair() {
   }
 }
 
+// ---------- монеты на камерах ----------
+// Монета лежит на полу кадра и едет вместе с дрейфом. Подобрать: нажать (логика в coins.js).
+let coinSig = '';
+function renderCoins() {
+  if (!els.world) return;
+  const list = shown === null || isBroken(shown) ? [] : S.coins.filter((c) => c.where === 'cam' && c.cam === shown);
+  const sig = `${shown}|${list.map((c) => c.id).join(',')}`;
+  if (sig === coinSig) return;
+  coinSig = sig;
+  els.world.querySelectorAll('.cam-coin').forEach((n) => n.remove());
+  for (const c of list) {
+    const b = el('button', 'coin cam-coin', els.world);
+    b.type = 'button';
+    b.style.left = `${c.x}%`;
+    b.style.top = `${c.y}%`;
+    b.setAttribute('aria-label', T('coins.label'));
+    onPress(b, () => E('intent:coin', { id: c.id }));
+  }
+}
+
 function showView(cam) {
   const meta = cameraMeta(cam);
   if (!meta) return;
@@ -600,6 +620,7 @@ function showView(cam) {
   }
   renderSprites();
   renderRepair();
+  renderCoins();
   startNoise();
 }
 
@@ -611,6 +632,7 @@ function hideView() {
   els.sprites?.replaceChildren();
   sprSig = '';
   renderRepair();
+  renderCoins();
   stopNoise();
 }
 
@@ -683,6 +705,7 @@ export function mount(rootEl, ctx) {
       syncHud();
       renderSprites();
       renderRepair();
+      renderCoins();
       const broken = isBroken(shown);
       if (broken !== els.broken) {
         els.broken = broken;

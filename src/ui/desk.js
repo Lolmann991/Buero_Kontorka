@@ -168,6 +168,67 @@ function zoomVars() {
   };
 }
 
+// ---------- износ: процедурные текстуры грязи, ржавчины и царапин ----------
+// Рисуются один раз на canvas (с зерном, чтобы левая и правая стены отличались) и кладутся поверх как картинки.
+function prng(seed) {
+  let x = seed >>> 0;
+  return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+}
+
+// o: blots (пятна), streaks (подтёки сверху вниз), scratches (царапины), speck (доля крапинок), цвета 'r,g,b'.
+function grimeTexture(w, h, seed, o = {}) {
+  const r = prng(seed);
+  const [c, g] = makeCanvas(w, h);
+  const blotRGB = o.blotRGB ?? '18,14,8';
+  for (let i = 0; i < (o.blots ?? 40); i++) {
+    const x = r() * w, y = r() * h, rad = (0.03 + r() * (o.blotSize ?? 0.12)) * Math.max(w, h);
+    const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+    gr.addColorStop(0, `rgba(${blotRGB},${((o.blotA ?? 0.2) * (0.4 + r() * 0.6)).toFixed(3)})`);
+    gr.addColorStop(1, `rgba(${blotRGB},0)`);
+    g.fillStyle = gr;
+    g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+  }
+  const streakRGB = o.streakRGB ?? '25,18,10';
+  for (let i = 0; i < (o.streaks ?? 25); i++) {
+    const x = r() * w, y0 = (o.streakTop ? 0 : r() * h * 0.6), len = (0.1 + r() * 0.5) * h, sw = 1 + r() * (o.streakW ?? 4);
+    const gr = g.createLinearGradient(0, y0, 0, y0 + len);
+    gr.addColorStop(0, `rgba(${streakRGB},${((o.streakA ?? 0.25) * (0.5 + r() * 0.5)).toFixed(3)})`);
+    gr.addColorStop(1, `rgba(${streakRGB},0)`);
+    g.fillStyle = gr;
+    g.fillRect(x, y0, sw, len);
+  }
+  g.lineCap = 'round';
+  for (let i = 0; i < (o.scratches ?? 30); i++) {
+    const x = r() * w, y = r() * h, a = (o.scratchAngle ?? r() * Math.PI) + (r() - 0.5) * 0.6, l = 6 + r() * (o.scratchLen ?? 60);
+    const dx = Math.cos(a) * l, dy = Math.sin(a) * l;
+    g.lineWidth = 0.6 + r() * 1.2;
+    g.strokeStyle = `rgba(0,0,0,${(0.25 + r() * 0.25).toFixed(2)})`;
+    g.beginPath(); g.moveTo(x + 1, y + 1); g.lineTo(x + dx + 1, y + dy + 1); g.stroke();
+    g.strokeStyle = `rgba(200,205,195,${(0.06 + r() * 0.1).toFixed(2)})`;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + dx, y + dy); g.stroke();
+  }
+  const sp = o.speck ?? 0.04;
+  if (sp > 0) {
+    const img = g.getImageData(0, 0, w, h);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (r() > sp) continue;
+      const light = r() < (o.lightSpeck ?? 0.15);
+      const a = light ? 10 + r() * 25 : 30 + r() * 70;                 // светлые крупинки еле заметны
+      d[i] = d[i + 1] = d[i + 2] = light ? 140 : 0;
+      d[i + 3] = Math.min(255, d[i + 3] + a);
+    }
+    g.putImageData(img, 0, 0);
+  }
+  return c.toDataURL('image/png');
+}
+
+let grimeTile = null;   // мелкая плитка износа для HTML-кнопок и плашек (повторяется)
+function grimeTileUrl() {
+  grimeTile ||= grimeTexture(160, 160, 77, { blots: 10, blotA: 0.25, blotSize: 0.3, streaks: 6, scratches: 14, scratchLen: 30, speck: 0.03, lightSpeck: 0.05 });
+  return grimeTile;
+}
+
 function buildSide(parent, side, ctx) {
   const { t, emit } = ctx;
   const flip = side === 'right';
@@ -206,16 +267,90 @@ function buildSide(parent, side, ctx) {
   const clip = svgEl('clipPath', { id: id('clip') }, defs);
   svgEl('rect', { x: X(DOOR.x, DOOR.w), y: DOOR.y, width: DOOR.w, height: DOOR.h }, clip);
 
-  // стена, плинтус, пол
+  const seed = flip ? 911 : 404;
+  const R = prng(seed);
+  const img = (href, x, y, w, h, { parent: into = s, ...attrs } = {}) => {
+    const n = svgEl('image', { href, x, y, width: w, height: h, preserveAspectRatio: 'none', ...attrs }, into);
+    n.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
+    return n;
+  };
+
+  // стена: краска сверху, тёмная панель снизу, плинтус, грязный пол
   svgEl('rect', { x: 0, y: 0, width: SIDE_W, height: SIDE_H, fill: `url(#${id('wall')})` }, s);
+  svgEl('rect', { x: 0, y: 520, width: SIDE_W, height: 280, fill: 'rgba(40,33,22,0.38)' }, s);
+  svgEl('rect', { x: 0, y: 512, width: SIDE_W, height: 10, fill: '#1b1d19' }, s);
+  svgEl('rect', { x: 0, y: 512, width: SIDE_W, height: 2, fill: 'rgba(160,170,150,0.12)' }, s);
   svgEl('rect', { x: 0, y: 815, width: SIDE_W, height: SIDE_H - 815, fill: `url(#${id('floor')})` }, s);
-  svgEl('rect', { x: 0, y: 800, width: SIDE_W, height: 15, fill: '#0c0d0d' }, s);
-  // доска объявлений на стене (просто тёмные листки)
-  const board = svgEl('g', { opacity: 0.5 }, s);
-  svgEl('rect', { x: X(70, 170), y: 250, width: 170, height: 220, fill: '#14110d', stroke: '#1f1b16', 'stroke-width': 6 }, board);
-  for (const [x, y, w, h] of [[88, 268, 70, 90], [168, 276, 56, 70], [92, 372, 120, 80]]) {
-    svgEl('rect', { x: X(x, w), y, width: w, height: h, fill: '#2a2823' }, board);
+  for (let x = flip ? 30 : 10; x < SIDE_W; x += 115) {                  // швы линолеума
+    svgEl('line', { x1: x, y1: 815, x2: x + (x - SIDE_W / 2) * 0.12, y2: SIDE_H, stroke: 'rgba(0,0,0,0.5)', 'stroke-width': 2 }, s);
   }
+  svgEl('rect', { x: 0, y: 800, width: SIDE_W, height: 15, fill: '#0c0d0d' }, s);
+  // грязь, подтёки, царапины по всей стене и полу
+  img(grimeTexture(585, 470, seed, { blots: 70, blotA: 0.32, streaks: 45, streakTop: true, streakA: 0.22, scratches: 40, speck: 0.015, lightSpeck: 0.05 }),
+    0, 0, SIDE_W, SIDE_H, { opacity: 0.95 });
+  // ржавое пятно от протечки у потолка
+  const sx = X(R() * 300 + (flip ? 80 : 650), 0);
+  const stain = svgEl('radialGradient', { id: id('stain') }, defs);
+  svgEl('stop', { offset: 0, 'stop-color': 'rgba(70,52,25,0.35)' }, stain);
+  svgEl('stop', { offset: 0.8, 'stop-color': 'rgba(60,45,20,0.2)' }, stain);
+  svgEl('stop', { offset: 1, 'stop-color': 'rgba(50,35,15,0)' }, stain);
+  svgEl('ellipse', { cx: sx, cy: 20, rx: 190, ry: 130, fill: `url(#${id('stain')})` }, s);
+  svgEl('ellipse', { cx: sx + 10, cy: 25, rx: 150, ry: 100, fill: 'none', stroke: 'rgba(55,40,18,0.35)', 'stroke-width': 3,
+    'stroke-dasharray': '40 6 70 10 30 5' }, s);
+  // трещины от угла двери и от потолка
+  const crack = (pts) => {
+    const d = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${X(x)},${y}`).join(' ');
+    svgEl('path', { d, fill: 'none', stroke: 'rgba(140,150,135,0.13)', 'stroke-width': 2, transform: 'translate(1.5 1.5)' }, s);
+    svgEl('path', { d, fill: 'none', stroke: '#030403', 'stroke-width': 2.2, 'stroke-linejoin': 'round' }, s);
+  };
+  crack([[DOOR.x + DOOR.w + 16, DOOR.y - 16], [DOOR.x + DOOR.w + 40, DOOR.y - 44], [DOOR.x + DOOR.w + 34, DOOR.y - 66],
+    [DOOR.x + DOOR.w + 70, DOOR.y - 95], [DOOR.x + DOOR.w + 64, 0]]);
+  crack([[DOOR.x - 16, DOOR.y + 330], [DOOR.x - 52, DOOR.y + 318], [DOOR.x - 70, DOOR.y + 340], [DOOR.x - 120, DOOR.y + 333]]);
+  // облупившаяся краска у перил
+  for (let i = 0; i < 5; i++) {
+    const px = R() * (SIDE_W - 200) + 60, py = 470 + R() * 90, pw = 18 + R() * 40, ph = 8 + R() * 22;
+    const pts = [[px, py], [px + pw * 0.6, py - ph * 0.4], [px + pw, py + ph * 0.2], [px + pw * 0.7, py + ph], [px + pw * 0.1, py + ph * 0.8]];
+    svgEl('polygon', { points: P(pts), fill: 'rgba(110,112,98,0.16)', stroke: 'rgba(0,0,0,0.5)', 'stroke-width': 1.2 }, s);
+  }
+  // потёртости от стульев на плинтусе
+  for (let i = 0; i < 7; i++) {
+    svgEl('ellipse', { cx: R() * SIDE_W, cy: 785 + R() * 20, rx: 30 + R() * 60, ry: 4 + R() * 5, fill: 'rgba(0,0,0,0.35)' }, s);
+  }
+  // розетка с треснувшей крышкой и кабель к панели кнопок
+  const sock = svgEl('g', {}, s);
+  svgEl('rect', { x: X(880, 50), y: 700, width: 50, height: 62, rx: 5, fill: '#2b2a24', stroke: '#11110e', 'stroke-width': 2 }, sock);
+  svgEl('circle', { cx: X(898), cy: 731, r: 4, fill: '#050505' }, sock);
+  svgEl('circle', { cx: X(912), cy: 731, r: 4, fill: '#050505' }, sock);
+  svgEl('path', { d: `M${X(884)},712 L${X(900)},726 L${X(896)},748`, stroke: '#0a0a08', 'stroke-width': 1.5, fill: 'none' }, sock);
+  svgEl('path', { d: `M${X(905)},${PLATE.y + PLATE.h} C${X(930)},680 ${X(860)},690 ${X(905)},700`, stroke: '#0b0b0a',
+    'stroke-width': 7, fill: 'none', 'stroke-linecap': 'round' }, s);
+
+  // пробковая доска с пожелтевшими листками
+  const by = flip ? 0 : -130;                        // слева доска выше: под ней кофемашина
+  const board = svgEl('g', { opacity: 0.75, transform: `translate(0 ${by})` }, s);
+  svgEl('rect', { x: X(60, 190), y: 240, width: 190, height: 240, fill: '#2a2014', stroke: '#16120c', 'stroke-width': 8 }, board);
+  img(grimeTexture(95, 120, seed + 3, { blots: 30, blotRGB: '10,6,2', blotA: 0.4, streaks: 0, scratches: 5, speck: 0.15 }),
+    X(64, 182), 244, 182, 232, { parent: board });
+  for (const [x, y, w, h, rot, col] of [[80, 262, 76, 96, -4, '#8f8a6e'], [168, 268, 60, 72, 6, '#9a8f62'],
+    [86, 372, 128, 82, 2, '#7d7a66'], [190, 352, 40, 50, -12, '#a39468']]) {
+    const g2 = svgEl('g', { transform: `rotate(${flip ? -rot : rot} ${X(x + w / 2)} ${y + h / 2})` }, board);
+    svgEl('rect', { x: X(x, w), y, width: w, height: h, fill: col, opacity: 0.55 }, g2);
+    for (let ly = y + 14; ly < y + h - 8; ly += 9) {
+      svgEl('rect', { x: X(x + 8, w * (0.5 + R() * 0.35)), y: ly, width: w * (0.5 + R() * 0.35), height: 2, fill: 'rgba(30,25,15,0.5)' }, g2);
+    }
+    svgEl('circle', { cx: X(x + w / 2), cy: y + 5, r: 4, fill: '#7a1a14' }, g2);
+  }
+
+  // записка на скотче рядом с дверью
+  const note = svgEl('g', { transform: `rotate(${flip ? 4 : -5} ${X(DOOR.x + DOOR.w + 70)} 300)` }, s);
+  svgEl('rect', { x: X(DOOR.x + DOOR.w + 18, 150), y: 250, width: 150, height: 96, fill: '#a9a17f', opacity: 0.62 }, note);
+  svgEl('rect', { x: X(DOOR.x + DOOR.w + 70, 40), y: 242, width: 40, height: 14, fill: 'rgba(200,190,150,0.45)' }, note);
+  const nt = svgEl('text', { x: X(DOOR.x + DOOR.w + 93), y: 282, 'text-anchor': 'middle', fill: '#1c1a14', 'font-size': 14,
+    'font-family': '"Marker Felt", "Segoe Print", "Comic Sans MS", cursive', opacity: 0.85 }, note);
+  t(`office.note.${side}`).split('\n').forEach((line, i) => {
+    const ts = svgEl('tspan', { x: X(DOOR.x + DOOR.w + 93), dy: i ? 21 : 0 }, nt);
+    ts.textContent = line;
+  });
 
   // коридор за дверью: перспектива, свет лампы, враг; всё обрезано проёмом
   const D = DOOR;
@@ -236,7 +371,7 @@ function buildSide(parent, side, ctx) {
     const sx = D.x + (bx0 - D.x) * (1 - k), ex = D.x + D.w - (D.x + D.w - bx1) * (1 - k);
     svgEl('line', { x1: X(sx), y1: y, x2: X(ex), y2: y, stroke: '#1d201c', 'stroke-width': 2 }, hall);
   }
-  svgEl('rect', { x: X(bx0 + 18, bx1 - bx0 - 36), y: by0 + 14, width: bx1 - bx0 - 36, height: 6, fill: '#c8d8cc' }, hall); // лампа
+  svgEl('rect', { x: X(bx0 + 18, bx1 - bx0 - 36), y: by0 + 14, width: bx1 - bx0 - 36, height: 6, fill: '#c8d8cc', class: 'hall-lamp' }, hall); // лампа
   svgEl('polygon', { class: 'hall-cone', fill: `url(#${id('cone')})`,
     points: P([[bx0 + 10, by0 + 18], [bx1 - 10, by0 + 18], [D.x + D.w + 40, D.y + D.h], [D.x - 40, D.y + D.h]]) }, hall);
   const ew = ENEMY_DOOR.h * ENEMY_DOOR.aspect;
@@ -253,22 +388,74 @@ function buildSide(parent, side, ctx) {
     svgEl('rect', { x: X(D.x, D.w), y, width: D.w, height: 4, fill: '#0f1112' }, shutter);
     svgEl('rect', { x: X(D.x, D.w), y: y + 4, width: D.w, height: 2, fill: '#4a5154' }, shutter);
   }
-  svgEl('rect', { x: X(D.x, D.w), y: D.y + D.h - 40, width: D.w, height: 40, fill: `url(#${id('hazard')})` }, shutter);
+  for (let y = D.y; y < D.y + D.h - 40; y += 38) {                 // ламели чуть разного оттенка
+    const v = R();
+    svgEl('rect', { x: X(D.x, D.w), y: y + 6, width: D.w, height: 28,
+      fill: v < 0.5 ? `rgba(0,0,0,${(v * 0.3).toFixed(2)})` : `rgba(255,255,240,${((v - 0.5) * 0.06).toFixed(3)})` }, shutter);
+  }
+  svgEl('rect', { x: X(D.x, D.w), y: D.y + D.h - 40, width: D.w, height: 40, fill: `url(#${id('hazard')})`, opacity: 0.7 }, shutter);
+  img(grimeTexture(230, 345, seed + 4, { blots: 55, blotRGB: '90,42,10', blotA: 0.42, blotSize: 0.07, streaks: 55,
+    streakRGB: '85,40,12', streakA: 0.42, streakW: 2.5, scratches: 50, scratchAngle: 0, scratchLen: 50, speck: 0.03, lightSpeck: 0.05 }),
+  X(D.x, D.w), D.y, D.w, D.h, { parent: shutter });
+  for (const [dx, dy, rx, ry] of [[0.3, 0.45, 38, 22], [0.68, 0.7, 26, 16], [0.55, 0.22, 18, 12]]) {   // вмятины
+    const cx = X(D.x + D.w * dx), cy = D.y + D.h * dy;
+    svgEl('ellipse', { cx, cy: cy - 3, rx, ry, fill: 'rgba(0,0,0,0.35)' }, shutter);
+    svgEl('ellipse', { cx: cx + (flip ? -3 : 3), cy: cy + 4, rx: rx * 0.8, ry: ry * 0.6, fill: 'rgba(200,210,205,0.07)' }, shutter);
+  }
   svgEl('rect', { x: X(D.x + D.w / 2 - 50, 100), y: D.y + D.h - 80, width: 100, height: 18, rx: 4, fill: '#0e1011' }, shutter);
+  // наклейка, наполовину содранная
+  const stk = svgEl('g', { transform: `rotate(${flip ? 7 : -6} ${X(D.x + 110)} ${D.y + 520})` }, shutter);
+  svgEl('rect', { x: X(D.x + 50, 120), y: D.y + 500, width: 120, height: 40, fill: '#b59a2a', opacity: 0.75 }, stk);
+  svgEl('polygon', { points: P([[D.x + 140, D.y + 500], [D.x + 170, D.y + 500], [D.x + 170, D.y + 526]]), fill: '#2a2d2e' }, stk);
+  const stt = svgEl('text', { x: X(D.x + 105), y: D.y + 526, 'text-anchor': 'middle', fill: '#1a1608', 'font-size': 13,
+    'font-weight': 800, 'font-family': 'system-ui, sans-serif' }, stk);
+  stt.textContent = t('office.sticker');
+  // нацарапано на металле
+  const scr = svgEl('text', { x: X(D.x + D.w * 0.62), y: D.y + 300, 'text-anchor': 'middle', fill: 'none',
+    stroke: 'rgba(210,215,205,0.22)', 'stroke-width': 1.4, 'font-size': 64,
+    'font-family': '"Marker Felt", "Segoe Print", "Comic Sans MS", cursive', transform: `rotate(-8 ${X(D.x + D.w * 0.62)} ${D.y + 300})` }, shutter);
+  scr.textContent = t(`office.scratch.${side}`);
 
   // коробка двери и надпись «выход» над ней
   svgEl('rect', { x: X(D.x - 16, D.w + 32), y: D.y - 16, width: D.w + 32, height: D.h + 16, fill: 'none',
     stroke: `url(#${id('frame')})`, 'stroke-width': 30 }, s);
   svgEl('rect', { x: X(D.x - 4, D.w + 8), y: D.y - 4, width: D.w + 8, height: 8, fill: '#0b0c0c' }, s);
+  // ржавчина и сколы краски на коробке двери
+  const ring = svgEl('clipPath', { id: id('ring') }, defs);
+  svgEl('path', { 'clip-rule': 'evenodd', d: `M${X(D.x - 31, D.w + 62)},${D.y - 31} h${D.w + 62} v${D.h + 31} h${-(D.w + 62)} Z `
+    + `M${X(D.x - 1, D.w + 2)},${D.y - 1} h${D.w + 2} v${D.h + 1} h${-(D.w + 2)} Z` }, ring);
+  const frameWear = svgEl('g', { 'clip-path': `url(#${id('ring')})` }, s);
+  img(grimeTexture(130, 190, seed + 1, { blots: 45, blotRGB: '95,45,12', blotA: 0.55, blotSize: 0.08, streaks: 30,
+    streakRGB: '80,38,10', streakA: 0.45, streakW: 3, scratches: 30, scratchLen: 25, speck: 0.05, lightSpeck: 0.05 }),
+  X(D.x - 31, D.w + 62), D.y - 31, D.w + 62, D.h + 31, { parent: frameWear });
+  for (let i = 0; i < 14; i++) {                                   // сколы до голого металла
+    const onSide = R() < 0.7;
+    const cx = onSide ? (R() < 0.5 ? D.x - 16 : D.x + D.w + 16) + (R() - 0.5) * 20 : D.x + R() * D.w;
+    const cy = onSide ? D.y + R() * D.h : D.y - 16 + (R() - 0.5) * 20;
+    svgEl('ellipse', { cx: X(cx), cy, rx: 2 + R() * 7, ry: 2 + R() * 5, fill: R() < 0.5 ? '#4e5552' : '#5a3418', opacity: 0.8 }, frameWear);
+  }
+
+  // табличка «выход»: грязное стекло, трещина, одна буква почти погасла
   const sign = svgEl('g', { class: 'exit-sign' }, s);
-  svgEl('rect', { x: X(D.x + D.w / 2 - 95, 190), y: 38, width: 190, height: 48, rx: 4, fill: '#062a14', stroke: '#1d7a3d',
+  svgEl('rect', { x: X(D.x + D.w / 2 - 95, 190), y: 38, width: 190, height: 48, rx: 4, fill: '#051f10', stroke: '#1a5e33',
     'stroke-width': 3 }, sign);
-  const txt = svgEl('text', { x: X(D.x + D.w / 2), y: 70, 'text-anchor': 'middle', fill: '#5dff98',
+  const txt = svgEl('text', { x: X(D.x + D.w / 2), y: 70, 'text-anchor': 'middle', fill: '#4be585',
     'font-size': 26, 'font-weight': 700, 'font-family': 'ui-monospace, Menlo, Consolas, monospace', 'letter-spacing': 2 }, sign);
-  txt.textContent = t('office.exit');
+  const word = t('office.exit');
+  const dead = flip ? 2 : word.length - 3;
+  [...word].forEach((ch, i) => {
+    const ts = svgEl('tspan', i === dead ? { class: 'exit-dead' } : {}, txt);
+    ts.textContent = ch;
+  });
+  img(grimeTexture(95, 24, seed + 2, { blots: 14, blotA: 0.6, blotSize: 0.3, streaks: 4, scratches: 4, speck: 0.08 }),
+    X(D.x + D.w / 2 - 95, 190), 38, 190, 48, { parent: sign });
+  svgEl('path', { d: `M${X(D.x + D.w / 2 + 40)},38 L${X(D.x + D.w / 2 + 52)},58 L${X(D.x + D.w / 2 + 44)},70 L${X(D.x + D.w / 2 + 60)},86`,
+    stroke: 'rgba(200,255,210,0.35)', 'stroke-width': 1.2, fill: 'none' }, sign);
 
   // темнота у стыка с фото стола: шов уходит в тень
   svgEl('rect', { x: flip ? 0 : SIDE_W - 160, y: 0, width: 160, height: SIDE_H, fill: `url(#${id('seam')})` }, s);
+
+  const coffee = flip ? null : buildCoffee(s, wrap, { defs, id, img, seed, t, emit });
 
   // панель с кнопками (HTML поверх SVG, в процентах стены)
   const plate = el('div', 'door-plate', wrap);
@@ -276,12 +463,16 @@ function buildSide(parent, side, ctx) {
   plate.style.top = `${(PLATE.y / SIDE_H) * 100}%`;
   plate.style.width = `${(PLATE.w / SIDE_W) * 100}%`;
   plate.style.height = `${(PLATE.h / SIDE_H) * 100}%`;
+  plate.style.setProperty('--plate-tex', `url(${grimeTexture(90, 140, seed + 5, { blots: 25, blotRGB: '60,40,15', blotA: 0.45,
+    blotSize: 0.15, streaks: 14, streakRGB: '70,35,10', streakA: 0.4, scratches: 26, scratchLen: 20, speck: 0.1 })})`);
+  plate.style.setProperty('--tilt', `${flip ? 1.1 : -0.9}deg`);
   const mkBtn = (cls, label, intent) => {
     const b = el('button', `door-btn ${cls}`, plate);
     b.type = 'button';
     el('i', '', b);
     const span = el('span', '', b);
     span.textContent = label;
+    span.style.setProperty('--tape', `${((R() - 0.5) * 7).toFixed(1)}deg`);   // подписи на малярном скотче, криво
     b.addEventListener('pointerup', (e) => { if (e.button <= 0) emit(intent, { side }); });
     return b;
   };
@@ -290,7 +481,131 @@ function buildSide(parent, side, ctx) {
   doorBtn.setAttribute('aria-label', t(`office.door.${side}`));
   lightBtn.setAttribute('aria-label', t(`office.light.${side}`));
 
-  return { wrap, doorBtn, lightBtn, enemy: false, closed: null, lit: null };
+  return { wrap, doorBtn, lightBtn, coffee, enemy: false, closed: null, lit: null };
+}
+
+// ---------- кофемашина на тумбе у левой стены ----------
+const COFFEE = { x: 95, y: 405, w: 130, h: 192 };          // корпус машины (координаты левой стены)
+const CABINET = { x: 48, y: 596, w: 224, h: 204 };
+
+function buildCoffee(s, wrap, { defs, id, img, seed, t, emit }) {
+  const C = COFFEE, K = CABINET;
+  const g = svgEl('g', { class: 'coffee-svg' }, s);
+  const lin = (name, stops, x2 = 0, y2 = 1) => {
+    const gr = svgEl('linearGradient', { id: id(name), x1: 0, y1: 0, x2, y2 }, defs);
+    for (const [o, c] of stops) svgEl('stop', { offset: o, 'stop-color': c }, gr);
+    return `url(#${id(name)})`;
+  };
+  // тумба: тёмный ламинат, царапины, кофейные потёки
+  svgEl('rect', { x: K.x, y: K.y, width: K.w, height: K.h, fill: lin('cab', [[0, '#2e271d'], [1, '#17130e']]) }, g);
+  svgEl('rect', { x: K.x - 6, y: K.y - 8, width: K.w + 12, height: 12, rx: 2, fill: '#3b3428' }, g);
+  svgEl('line', { x1: K.x + K.w / 2, y1: K.y + 10, x2: K.x + K.w / 2, y2: K.y + K.h - 18, stroke: '#0b0906', 'stroke-width': 3 }, g);
+  for (const hx of [K.x + K.w / 2 - 22, K.x + K.w / 2 + 12]) {
+    svgEl('rect', { x: hx, y: K.y + 60, width: 10, height: 34, rx: 3, fill: '#5d5a52' }, g);
+  }
+  svgEl('rect', { x: K.x, y: K.y + K.h - 18, width: K.w, height: 18, fill: '#0b0a08' }, g);
+  img(grimeTexture(112, 102, seed + 9, { blots: 22, blotRGB: '40,22,8', blotA: 0.5, streaks: 18, streakTop: true,
+    streakRGB: '55,30,10', streakA: 0.5, scratches: 22, speck: 0.03, lightSpeck: 0.05 }), K.x, K.y - 8, K.w, K.h + 8, { parent: g });
+  // корпус машины
+  svgEl('rect', { x: C.x + 12, y: C.y - 8, width: C.w - 24, height: 22, rx: 4, fill: 'rgba(130,170,180,0.22)', stroke: 'rgba(160,190,200,0.25)' }, g); // бак
+  svgEl('rect', { x: C.x, y: C.y + 10, width: C.w, height: C.h - 10, rx: 9, fill: lin('mach', [[0, '#26282b'], [0.5, '#151618'], [1, '#0b0c0d']], 1, 0) }, g);
+  svgEl('rect', { x: C.x + 16, y: C.y + 34, width: C.w - 32, height: 30, rx: 3, fill: '#020403', stroke: '#2f3233', 'stroke-width': 2 }, g); // дисплей
+  for (const bx of [C.x + 30, C.x + 52, C.x + 74, C.x + 96]) {
+    svgEl('circle', { cx: bx, cy: C.y + 78, r: 6, fill: '#3a3c3e', stroke: '#0a0a0a', 'stroke-width': 1.5 }, g);
+  }
+  svgEl('rect', { x: C.x + 20, y: C.y + 94, width: C.w - 40, height: 88, rx: 4, fill: '#050505' }, g);           // ниша
+  svgEl('rect', { x: C.x + C.w / 2 - 12, y: C.y + 94, width: 24, height: 12, rx: 2, fill: '#8d9092' }, g);      // носик
+  svgEl('rect', { class: 'coffee-stream', x: C.x + C.w / 2 - 2, y: C.y + 106, width: 4, height: 44, fill: '#3b2412' }, g);
+  // кружка «на работе» со сколом
+  svgEl('rect', { x: C.x + C.w / 2 - 20, y: C.y + 146, width: 40, height: 36, rx: 4, fill: '#b9b3a2' }, g);
+  svgEl('path', { d: `M${C.x + C.w / 2 + 20},${C.y + 154} q14,2 12,12 q-2,9 -12,8`, fill: 'none', stroke: '#b9b3a2', 'stroke-width': 5 }, g);
+  svgEl('path', { d: `M${C.x + C.w / 2 - 20},${C.y + 146} l8,0 l-4,6 z`, fill: '#3a3a36' }, g);
+  svgEl('rect', { x: C.x + 12, y: C.y + 182, width: C.w - 24, height: 10, rx: 2, fill: '#5a5d60' }, g);         // поддон
+  for (let k = 0; k < 6; k++) svgEl('rect', { x: C.x + 18 + k * 16, y: C.y + 184, width: 10, height: 2, fill: '#202224' }, g);
+  img(grimeTexture(65, 96, seed + 10, { blots: 18, blotRGB: '50,30,12', blotA: 0.45, streaks: 10, streakRGB: '60,32,10',
+    streakA: 0.4, scratches: 16, scratchLen: 15, speck: 0.04, lightSpeck: 0.1 }), C.x, C.y + 10, C.w, C.h - 10, { parent: g });
+  // записка «Entkalken!»
+  const nt = svgEl('g', { transform: `rotate(9 ${C.x + C.w - 12} ${C.y + 30})` }, g);
+  svgEl('rect', { x: C.x + C.w - 40, y: C.y + 14, width: 62, height: 34, fill: '#c9b84a', opacity: 0.8 }, nt);
+  const tx = svgEl('text', { x: C.x + C.w - 9, y: C.y + 35, 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700,
+    fill: '#2a250a', 'font-family': '"Marker Felt", "Segoe Print", "Comic Sans MS", cursive' }, nt);
+  tx.textContent = t('coffee.note');
+  // пар над кружкой (виден, пока варит)
+  const steam = svgEl('g', { class: 'coffee-steam' }, g);
+  for (const dx of [-8, 4, 14]) {
+    svgEl('path', { d: `M${C.x + C.w / 2 + dx},${C.y + 140} q-8,-14 0,-26 q8,-12 0,-26`, fill: 'none',
+      stroke: 'rgba(220,230,225,0.35)', 'stroke-width': 4, 'stroke-linecap': 'round' }, steam);
+  }
+
+  // кнопка поверх машины (HTML) и надпись дисплея
+  const pct = (v, total) => `${((v / total) * 100).toFixed(2)}%`;
+  const btn = el('button', 'coffee-btn', wrap);
+  btn.type = 'button';
+  btn.style.left = pct(C.x - 8, SIDE_W);
+  btn.style.top = pct(C.y - 12, SIDE_H);
+  btn.style.width = pct(C.w + 16, SIDE_W);
+  btn.style.height = pct(C.h + 16, SIDE_H);
+  btn.setAttribute('aria-label', t('coffee.label'));
+  const disp = el('span', 'coffee-disp', btn);
+  disp.style.top = `${((34 + 12) / (C.h + 16)) * 100}%`;
+  disp.style.height = `${(30 / (C.h + 16)) * 100}%`;
+  disp.style.left = `${((16 + 8) / (C.w + 16)) * 100}%`;
+  disp.style.right = disp.style.left;
+  el('span', 'coffee-tip', btn).textContent = t('coffee.tip');
+  btn.addEventListener('pointerup', (e) => { if (e.button <= 0) emit('intent:coffee'); });
+  return { btn, disp, last: '' };
+}
+
+function syncCoffee(state, t) {
+  const c = els.sides.left.coffee;
+  if (!c) return;
+  const k = state.coffee;
+  let text, mode;
+  if (!state.running || state.tokens <= 0) { text = t('coffee.off'); mode = 'off'; }
+  else if (k.brewing) { text = t('coffee.brewing', { s: Math.ceil(k.left) }); mode = 'brew'; }
+  else if (k.cooldown > 0) { text = t('coffee.wait', { s: Math.ceil(k.cooldown) }); mode = 'wait'; }
+  else { text = t('coffee.ready'); mode = 'ready'; }
+  if (c.last !== text) { c.last = text; c.disp.textContent = text; }
+  if (c.mode !== mode) {
+    c.mode = mode;
+    c.btn.dataset.mode = mode;
+    els.sides.left.wrap.classList.toggle('is-brewing', mode === 'brew');
+  }
+}
+
+// ---------- усталость: темнеет по краям, моргание, на 100 — микросон ----------
+function buildTired(stage) {
+  const root = el('div', 'tired', stage);
+  const veil = el('div', 'tired-veil', root);
+  el('div', 'lid lid--top', root);
+  el('div', 'lid lid--bottom', root);
+  return { root, veil, next: 8, blink: 0, dur: 0, lid: -1, veilV: -1 };
+}
+
+function updateTired(state, dt) {
+  const T = els.tired;
+  const f = state.running ? state.fatigue : 0;
+  const veil = Math.round(Math.max(0, (f - 45) / 55) * 50) / 50;
+  if (veil !== T.veilV) { T.veilV = veil; T.veil.style.opacity = String(veil); }
+  let lid = 0;
+  if (T.blink > 0) {                                  // идёт моргание: быстро закрыть, подержать, открыть
+    T.blink -= dt;
+    const k = 1 - T.blink / T.dur;
+    lid = k < 0.25 ? k / 0.25 : k > 0.7 ? (1 - k) / 0.3 : 1;
+  } else if (f >= 55) {
+    T.next -= dt;
+    if (T.next <= 0) {
+      const q = (f - 55) / 45;                        // 0..1
+      const sleep = f >= 97 && Math.random() < 0.5;   // микросон
+      T.dur = sleep ? 2.2 + Math.random() : 0.2 + q * 0.5;
+      T.blink = T.dur;
+      T.next = (sleep ? 6 : 14 - 9 * q) * (0.7 + Math.random() * 0.6);
+    }
+  } else {
+    T.next = Math.max(T.next, 4);
+  }
+  lid = Math.round(Math.min(1, Math.max(0, lid)) * 40) / 40;
+  if (lid !== T.lid) { T.lid = lid; T.root.style.setProperty('--lid', String(lid)); }
 }
 
 // Плашка токенов и нагрузки поверх кабинета (в кадре камеры и на карте свои).
@@ -307,8 +622,13 @@ function buildOfficeHud(parent, t) {
   const bar = el('span', 'hud-load__bar', row2);
   const segs = [];
   for (let i = 0; i < HUD_SEGMENTS; i++) segs.push(el('i', i < 2 ? 'lv-g' : i < 4 ? 'lv-y' : 'lv-r', bar));
+  const tiredRow = el('div', 'oh-row', hud);
+  const tiredLabel = el('span', 'oh-label', tiredRow);
+  tiredLabel.textContent = t('office.tired');
+  const tiredFill = el('i', '', el('div', 'oh-bar oh-bar--tired', tiredRow));
   const doors = el('div', 'oh-doors', hud);
-  return { hud, num, fill, segs, doors, loadLabel, last: {} };
+  const info = el('div', 'oh-info', hud);
+  return { hud, num, fill, segs, doors, loadLabel, info, tiredLabel, tiredFill, last: {} };
 }
 
 function syncOffice(state, t) {
@@ -362,6 +682,35 @@ function syncOffice(state, t) {
   const word = (s) => t(state.doors[s] ? 'cams.map.doorClosed' : 'cams.map.doorOpen');
   const dt = t('cams.map.doors', { l: word('left'), r: word('right') });
   if (h.last.doors !== dt) { h.last.doors = dt; h.doors.textContent = dt; }
+  const tired = Math.round(state.fatigue);
+  if (h.last.tired !== tired) {
+    h.last.tired = tired;
+    h.tiredFill.style.width = `${tired}%`;
+    h.tiredLabel.classList.toggle('is-over', tired >= 75);
+  }
+  syncCoffee(state, t);
+  const info = t('office.info', { n: state.night, c: state.coinsNight });
+  if (h.last.info !== info) { h.last.info = info; h.info.textContent = info; }
+  syncCoins(state);
+}
+
+// Монеты в кабинете: на столе (scene) и на полу у дверей (side). Монеты на камерах рисует ui/cameras.js.
+function syncCoins(state) {
+  const list = state.running ? state.coins.filter((c) => c.where !== 'cam') : [];
+  const sig = list.map((c) => `${c.id}:${c.where}`).join(',');
+  if (sig === els.coinSig) return;
+  els.coinSig = sig;
+  for (const layer of Object.values(els.coinLayers)) layer.replaceChildren();
+  for (const c of list) {
+    const layer = els.coinLayers[c.where];
+    if (!layer) continue;
+    const b = el('button', 'coin', layer);
+    b.type = 'button';
+    b.style.left = `${c.x}%`;
+    b.style.top = `${c.y}%`;
+    b.setAttribute('aria-label', els.coinLabel);
+    b.addEventListener('pointerup', (e) => { if (e.button <= 0) els.emit('intent:coin', { id: c.id }); });
+  }
 }
 
 // Кнопки взгляда: стрелки по краям, «Камеры» внизу, «Назад» в режиме камер.
@@ -405,6 +754,7 @@ function onKey(e, ctx) {
     case ' ': emit('intent:view', { view: v === 'cams' ? 'desk' : 'cams' }); break;
     case 't': if (side) emit('intent:door', { side }); else handled = false; break;
     case 'l': if (side) emit('intent:light', { side }); else handled = false; break;
+    case 'c': if (v === 'left') emit('intent:coffee'); else handled = false; break;
     default: handled = false;
   }
   if (handled) e.preventDefault();
@@ -826,15 +1176,30 @@ function updateScare(dt, ctx) {
   sc.t += dt;
   if (sc.t >= SCARE_END) {
     resetScare();
-    showStart('ui.shiftFailed', ctx);
+    ctx.emit('ui:scareDone');      // дальше экран «Game Over» (ui/screens.js)
     return;
   }
   sc.root.dataset.phase = sc.t < SCARE_FLASH ? 'flash' : sc.t < SCARE_CUT_AT ? 'show' : 'black';
   drawScare(sc, dt);
 }
 
+// Меню: звёзды за пройденные ночи, монеты, заработок, кнопки «Ночь N» и «Новая игра».
+const MAX_STARS = 5;
+function renderMenu(ctx) {
+  const { state, t } = ctx;
+  const f = state.flags;
+  const stars = Math.min(MAX_STARS, f.stars || 0);
+  els.menuStars.textContent = '★'.repeat(stars) + '☆'.repeat(MAX_STARS - stars);
+  els.menuStars.setAttribute('aria-label', t('menu.starsLabel', { n: stars, max: MAX_STARS }));
+  els.menuStats.textContent = t('menu.stats', { coins: f.coins || 0, money: ((f.money || 0) / 100).toFixed(2).replace('.', ',') });
+  els.startBtn.textContent = t('menu.startNight', { n: state.night });
+  els.newGameBtn.hidden = state.night <= 1;
+  els.menuWeek.hidden = !f.weekDone;
+}
+
 function showStart(titleKey, ctx) {
   els.startTitle.textContent = ctx.t(titleKey);
+  renderMenu(ctx);
   els.start.hidden = false;
 }
 
@@ -852,6 +1217,7 @@ export function mount(rootEl, ctx) {
   els.stage = el('div', 'stage', root);
   els.stage.dataset.view = 'desk';
   for (const [k, v] of Object.entries(zoomVars())) els.stage.style.setProperty(k, v);
+  els.stage.style.setProperty('--grime', `url(${grimeTileUrl()})`);
   els.room = el('div', 'room', els.stage);
   els.sides = {};
   els.sides.left = buildSide(els.room, 'left', ctx);
@@ -899,7 +1265,13 @@ export function mount(rootEl, ctx) {
   buildFxAbove(els.scene, els.stage);
   renderClock(state);
 
+  els.tired = buildTired(els.stage);
   els.hud = buildOfficeHud(els.stage, t);
+  els.coinLabel = t('coins.label');
+  els.emit = emit;
+  els.coinSig = '';
+  els.coinLayers = { desk: el('div', 'coin-layer', els.scene) };
+  for (const side of ['left', 'right']) els.coinLayers[side] = el('div', 'coin-layer', els.sides[side].wrap);
   buildNav(els.stage, ctx);
   bindSwipe(els.stage, ctx);
   els.keyHandler = (e) => onKey(e, ctx);
@@ -928,6 +1300,22 @@ export function mount(rootEl, ctx) {
   els.startBtn.type = 'button';
   els.startBtn.textContent = t('ui.startShift');
   els.startTitle.textContent = t('ui.title');
+  els.menuStars = el('div', 'menu-stars', els.start);
+  els.menuStats = el('p', 'start-hint menu-stats', els.start);
+  els.menuWeek = el('p', 'start-hint menu-week', els.start);
+  els.menuWeek.textContent = t('menu.weekDone');
+  els.start.insertBefore(els.menuStars, els.startHint);
+  els.start.insertBefore(els.menuStats, els.startHint);
+  els.start.insertBefore(els.menuWeek, els.startHint);
+  els.shopBtn = el('button', 'start-btn start-btn--ghost', els.start);
+  els.shopBtn.type = 'button';
+  els.shopBtn.textContent = t('shop.open');
+  els.shopBtn.addEventListener('pointerup', (e) => { if (e.button <= 0) emit('ui:shop'); });
+  els.newGameBtn = el('button', 'start-btn start-btn--ghost', els.start);
+  els.newGameBtn.type = 'button';
+  els.newGameBtn.textContent = t('menu.newGame');
+  els.newGameBtn.addEventListener('pointerup', (e) => { if (e.button <= 0) emit('intent:newGame'); });
+  renderMenu(ctx);
 
   // Полный экран: на Android Chrome кнопка убирает панели браузера; на iPhone Safari API нет,
   // там показываем подсказку про запуск с главного экрана (manifest + мета-теги в index.html).
@@ -979,6 +1367,7 @@ export function mount(rootEl, ctx) {
       updateShutdown(dt);
       updateScare(dt, ctx);
       syncOffice(state, t);
+      updateTired(state, dt);
     }),
     on('jumpscare', ({ enemyId }) => startScare(enemyId)),
     on('glitch', ({ type }) => {
@@ -997,9 +1386,9 @@ export function mount(rootEl, ctx) {
       syncCam();
       els.start.hidden = true;
     }),
-    // Временно: полноценный экран итога появится на этапе 10.
-    // После скримера (failed) стартовый экран покажет updateScare, когда кадр отыграет.
-    on('night:end', (p) => { if (!p?.failed) showStart('ui.shiftOver', ctx); }),
+    // Итог ночи рисует ui/screens.js («6 AM», чек, «Game Over»); оттуда возвращаемся в меню.
+    on('ui:menu', () => showStart('ui.title', ctx)),
+    on('progress:change', () => renderMenu(ctx)),
   ];
 }
 
