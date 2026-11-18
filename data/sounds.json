@@ -91,20 +91,6 @@
     "volume": 0.63
   },
   {
-    "id": "teams_ping",
-    "file": "assets/audio/teams_ping.mp3",
-    "kind": "ui",
-    "loop": false,
-    "volume": 0.74
-  },
-  {
-    "id": "teams_pressure",
-    "file": "assets/audio/teams_pressure.mp3",
-    "kind": "ui",
-    "loop": false,
-    "volume": 2.3
-  },
-  {
     "id": "repair_hold",
     "file": "assets/audio/repair_hold.mp3",
     "kind": "ui",
@@ -180,34 +166,6 @@
     "kind": "ambient",
     "loop": true,
     "volume": 0.16
-  },
-  {
-    "id": "teams_call",
-    "file": "assets/audio/teams_call.mp3",
-    "kind": "ui",
-    "loop": true,
-    "volume": 0.32
-  },
-  {
-    "id": "call_ringback",
-    "file": "assets/audio/call_ringback.mp3",
-    "kind": "ui",
-    "loop": true,
-    "volume": 0.37
-  },
-  {
-    "id": "call_pickup",
-    "file": "assets/audio/call_pickup.mp3",
-    "kind": "ui",
-    "loop": false,
-    "volume": 0.53
-  },
-  {
-    "id": "call_hangup",
-    "file": "assets/audio/call_hangup.mp3",
-    "kind": "ui",
-    "loop": false,
-    "volume": 0.28
   },
   {
     "id": "whistle_mr404",

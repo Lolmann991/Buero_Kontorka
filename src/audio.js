@@ -234,10 +234,13 @@ export function setAmbient(list) {
 // Работают как обычные звуки каталога (позиция, фильтр, панорама). Чтобы заменить на свой файл,
 // добавь запись с тем же id в data/sounds.json: каталог важнее заглушки.
 const SYNTH = {
-  teams_call: { volume: 0.5, make: makeRingtone },      // входящий звонок Teams (заглушка; свой teams_call.mp3 в sounds.json важнее)
-  call_ringback: { volume: 0.55, make: makeRingback },  // гудки исходящего звонка
-  call_pickup: { volume: 0.7, make: makePickup },       // «трубку взяли»
-  call_hangup: { volume: 0.6, make: makeHangup },       // «трубку положили»
+  // Звуки мессенджера в духе Teams: мягкая «маримба» с лёгким эхом (свои мелодии, не записи Microsoft).
+  teams_ping: { volume: 0.6, make: makeTeamsPing },       // новое сообщение / тикет
+  teams_pressure: { volume: 0.75, make: makeTeamsUrgent },// срочное сообщение (давление)
+  teams_call: { volume: 0.5, make: makeRingtone },        // входящий звонок (петля)
+  call_ringback: { volume: 0.45, make: makeRingback },    // исходящий звонок: «идёт вызов» (петля)
+  call_pickup: { volume: 0.6, make: makePickup },         // соединение
+  call_hangup: { volume: 0.55, make: makeHangup },        // звонок завершён
   whistle_mr404: { volume: 0.5, make: makeWhistle },
   laugh_mr404: { volume: 0.8, make: makeLaugh },
   warning_attack: { volume: 0.9, make: makeWarning },
@@ -455,44 +458,56 @@ function makeStamp(sr) {
   return out;
 }
 
-// Телефонные звуки (заглушки; свой файл с тем же id в sounds.json важнее).
-function tone(out, sr, from, dur, freqs, amp = 1) {
-  const a = Math.floor(from * sr);
-  const n = Math.floor(dur * sr);
-  for (let i = 0; i < n && a + i < out.length; i++) {
+// ---------- мессенджер (в духе Teams) ----------
+const NOTE = { G4: 392, A4: 440, C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880, C6: 1046.5, E6: 1318.5 };
+
+// Удар «маримбы»: основной тон и два быстро гаснущих обертона, мягкая атака без щелчка.
+function mallet(out, sr, at, f, amp = 1, decay = 1) {
+  const a = Math.floor(at * sr);
+  const len = Math.floor(sr * 1.4 * decay);
+  for (let i = 0; i < len && a + i < out.length; i++) {
     const t = i / sr;
-    const env = Math.min(1, t / 0.01) * Math.min(1, (dur - t) / 0.01);
-    let v = 0;
-    for (const f of freqs) v += Math.sin(2 * Math.PI * f * t);
-    out[a + i] += v / freqs.length * env * amp;
+    const v = Math.sin(2 * Math.PI * f * t) * Math.exp(-t * 4.5 / decay)
+      + 0.32 * Math.sin(2 * Math.PI * f * 3.93 * t) * Math.exp(-t * 16)
+      + 0.1 * Math.sin(2 * Math.PI * f * 9.2 * t) * Math.exp(-t * 34);
+    out[a + i] += amp * v * Math.min(1, t / 0.004);
   }
 }
-// Рингтон Teams: две трели по четыре двойных тона, потом пауза.
+
+// Короткое «комнатное» эхо, чтобы звук был не голым синтезом, а как из приложения.
+function roomy(out, sr, wet = 0.22) {
+  const dry = Float32Array.from(out);
+  for (const [d, g] of [[0.071, wet], [0.113, wet * 0.7], [0.167, wet * 0.45]]) {
+    const k = Math.floor(d * sr);
+    for (let i = k; i < out.length; i++) out[i] += g * dry[i - k];
+  }
+  return out;
+}
+
+const seq = (sec, notes, sr, decay = 1) => {
+  const out = new Float32Array(Math.floor(sr * sec));
+  for (const [at, n, amp = 1] of notes) mallet(out, sr, at, NOTE[n], amp, decay);
+  return roomy(out, sr);
+};
+
+// Новое сообщение: два мягких тона вверх.
+function makeTeamsPing(sr) { return seq(1.0, [[0, 'G5', 0.8], [0.11, 'C6']], sr); }
+// Срочное: три быстрых тона, дважды.
+function makeTeamsUrgent(sr) {
+  return seq(1.1, [[0, 'E6', 0.8], [0.08, 'C6', 0.8], [0.16, 'E6'], [0.45, 'E6', 0.7], [0.53, 'C6', 0.7], [0.61, 'E6', 0.9]], sr, 0.7);
+}
+// Входящий звонок: мелодичная фраза из двух частей и пауза, 4 с (петля).
 function makeRingtone(sr) {
-  const out = new Float32Array(Math.floor(sr * 2.4));
-  for (let r = 0; r < 2; r++) {
-    for (let k = 0; k < 4; k++) tone(out, sr, r * 0.9 + k * 0.1, 0.07, [880, 1320]);
-  }
-  return out;
+  return seq(4.0, [
+    [0, 'C5'], [0.17, 'E5'], [0.34, 'G5'], [0.51, 'E5', 0.8], [0.85, 'A5'], [1.02, 'G5', 0.8],
+    [1.6, 'C5'], [1.77, 'E5'], [1.94, 'G5'], [2.11, 'C6', 1.1],
+  ], sr);
 }
-// Гудки: 425 Гц, 1 с звук и 3 с тишины (петля).
-function makeRingback(sr) {
-  const out = new Float32Array(Math.floor(sr * 4));
-  tone(out, sr, 0, 1.0, [425]);
-  return out;
-}
-function makePickup(sr) {
-  const out = new Float32Array(Math.floor(sr * 0.25));
-  for (let i = 0; i < out.length; i++) out[i] = (Math.random() * 2 - 1) * Math.exp(-i / sr * 60);
-  tone(out, sr, 0.02, 0.05, [300]);
-  return out;
-}
-function makeHangup(sr) {
-  const out = new Float32Array(Math.floor(sr * 0.5));
-  tone(out, sr, 0, 0.12, [480, 620], 0.8);
-  tone(out, sr, 0.2, 0.12, [480, 620], 0.8);
-  return out;
-}
+// Исходящий звонок: два тихих тона каждые 3 с (петля).
+function makeRingback(sr) { return seq(3.0, [[0, 'A4', 0.9], [0.24, 'E5', 0.8]], sr, 1.3); }
+// Соединение: быстро вверх. Конец звонка: вниз.
+function makePickup(sr) { return seq(0.8, [[0, 'C5', 0.8], [0.08, 'G5']], sr, 0.6); }
+function makeHangup(sr) { return seq(0.9, [[0, 'G5'], [0.12, 'C5', 0.8]], sr, 0.6); }
 
 // Записи звонков (data/calls.json): audio.loadCalls(список) при загрузке игры.
 const callDefs = {};
